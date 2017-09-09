@@ -1,0 +1,10 @@
+profile.out
+cover.html
+coverage.txt
+apid
+*.impl
+*.iml
+.idea
+apid_config.yaml
+vendor/github.com/30x
+vendor/github.com/apigee-labs

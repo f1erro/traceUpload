@@ -1,0 +1,16 @@
+hash: 952e8777d5a2a7a84277bbc4773c03811953f4d8c7329fe3fe36b00b2d464630
+updated: 2017-09-07T16:34:13.907289936-07:00
+imports:
+- name: github.com/30x/apid-core
+  version: d323b9b92bcf238449504a691e3b31c140dd23c3
+- name: github.com/apigee-labs/transicator
+  version: a1cb686aa16121a1d9b23e056c56820aaf301d9a
+  subpackages:
+  - common
+- name: github.com/gorilla/mux
+  version: 24fca303ac6da784b9e8269f724ddeb0b2eea5e7
+testImports:
+- name: github.com/onsi/ginkgo
+  version: 11459a886d9cd66b319dac7ef1e917ee221372c9
+- name: github.com/onsi/gomega
+  version: dcabb60a477c2b6f456df65037cb6708210fbb02
