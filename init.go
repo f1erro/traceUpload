@@ -6,13 +6,16 @@ import (
 )
 
 var (
-  log      apid.LogService   // set in initPlugin
+  log              apid.LogService   // set in initPlugin
   services         apid.Services
+  config           apid.ConfigService
+
 )
 
 func initPlugin(s apid.Services) (apid.PluginData, error) {
   services = s
   log = services.Log().ForModule("apidGatewayTrace")
+  config = services.Config()
   log.Debug("Initializing apidGatewayTrace")
   dbMan := &dbManager{
     data:  services.Data(),
