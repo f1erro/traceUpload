@@ -61,7 +61,7 @@ func (a *apiManager) InitAPI() {
 		return
 	}
 	services.API().HandleFunc(a.signalEndpoint, a.apiGetTraceSignalEndpoint).Methods("GET")
-	services.API().HandleFunc(a.uploadEndpoint, a.apiUploadTraceDataEndpoint).Methods("GET")
+	services.API().HandleFunc(a.uploadEndpoint, a.apiUploadTraceDataEndpoint).Methods("POST")
 	a.apiInitialized = true
 	log.Debug("API endpoints initialized")
 }
@@ -195,11 +195,31 @@ func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.
 			return nil
 		},
 	}
-	s, err := getSignedURL(httpClient, config.GetString(configBlobServerBaseURI))
-	if err != nil {
-		w.WriteHeader(401)
+	blobMetadata := createBlobMetadata{}
+	sessionId := r.Header.Get("X-Apigee-Debug-ID")
+	if sessionId != "" && (len(strings.Split(sessionId, "__")) == 5){
+		sessionIdComponents := strings.Split(sessionId, "__")
+		blobMetadata.Customer = sessionIdComponents[0]
+		blobMetadata.Organization = sessionIdComponents[0]
+		blobMetadata.Environment = sessionIdComponents[1]
+		blobMetadata.Tags = []string {sessionIdComponents[4], sessionId}
 	} else {
-		w.Write([]byte(s))
+		a.writeError(w, 400, 400, fmt.Sprintf("Bad value for required header X-Apigee-Debug-ID: %s", sessionId))
+		return
+	}
+
+	s, err := getSignedURL(httpClient, blobMetadata, config.GetString(configBlobServerBaseURI))
+	if err != nil {
+		w.WriteHeader(500)
+	} else {
+		res, err := uploadToBlobstore(httpClient, s, r.Body)
+		if err != nil {
+			w.WriteHeader(401)
+
+		} else {
+			w.WriteHeader(res.StatusCode)
+			w.Write([]byte("Successfully uploaded trace to blobstore"))
+		}
 	}
 }
 
@@ -222,7 +242,7 @@ func (a *apiManager) writeInternalError(w http.ResponseWriter, err string) {
 	a.writeError(w, http.StatusInternalServerError, API_ERR_INTERNAL, err)
 }
 
-func getSignedURL(client *http.Client, blobServerURL string) (string, error) {
+func getSignedURL(client *http.Client, blobMetadata createBlobMetadata, blobServerURL string) (string, error) {
 
 	blobUri, err := url.Parse(blobServerURL)
 	if err != nil {
@@ -232,7 +252,7 @@ func getSignedURL(client *http.Client, blobServerURL string) (string, error) {
 	blobUri.Path += blobStoreUri
 	uri := blobUri.String()
 
-	surl, err := postWithAuth(client, uri, getTestBlobMetadata())
+	surl, err := postWithAuth(client, uri, blobMetadata)
 	if err != nil {
 		log.Errorf("Unable to get signed URL from BlobServer %s: %v", uri, err)
 		return "", err
@@ -246,12 +266,32 @@ func getSignedURL(client *http.Client, blobServerURL string) (string, error) {
 	}
 	res := blobServerResponse{}
 	err = json.Unmarshal(body, &res)
+	log.Debugf("%+v\n", res)
 	if err != nil {
 		log.Errorf("Invalid response from BlobServer for {%s} error: {%v}", uri, err)
 		return "", err
 	}
 
+
 	return res.SignedUrl, nil
+}
+
+func uploadToBlobstore(client *http.Client, uriString string, data io.Reader) (*http.Response, error){
+	req, err := http.NewRequest("PUT", uriString, data)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", "application/octet-stream")
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != 200 && res.StatusCode != 201 {
+		res.Body.Close()
+		return nil, fmt.Errorf("POST uri %s failed with status %d", uriString, res.StatusCode)
+	}
+	return res, nil
 }
 
 func postWithAuth(client *http.Client, uriString string, blobMetadata createBlobMetadata) (io.ReadCloser, error) {

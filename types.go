@@ -14,6 +14,11 @@ type blobServerResponse struct {
 	Self                     string `json:"self"`
 	SignedUrl                string `json:"signedurl"`
 	SignedUrlExpiryTimestamp string `json:"signedurlexpirytimestamp"`
+	Tags			 []string `json:"tags"`
+	Store 			 string `json:"store"`
+	Organization		 string `json"organization"`
+	ContentType		 string `json:"contentType"`
+	Customer		 string `json:"customer"`
 }
 
 func getTestBlobMetadata() createBlobMetadata {
