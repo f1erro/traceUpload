@@ -1,22 +1,12 @@
 package apidGatewayTrace
 
 import (
-	"sync"
-
-	"github.com/30x/apid-core"
+	"github.com/apid/apid-core"
 )
 
-type dbManagerInterface interface {
-	setDbVersion(string)
-	initDb() error
-	getTraceSignals() (result getTraceSignalsResult, err error)
-}
-
-type dbManager struct {
-	data  apid.DataService
-	db    apid.DB
-	dbMux sync.RWMutex
-}
+const (
+	TRACESIGNAL_DB_QUERY    = `SELECT id, uri, method FROM metadata_trace;`
+)
 
 func (dbc *dbManager) setDbVersion(version string) {
 	db, err := dbc.data.DBVersion(version)
@@ -35,7 +25,6 @@ func (dbc *dbManager) getDb() apid.DB {
 }
 
 func (dbc *dbManager) initDb() error {
-	// nothing to do here yet
 	return nil
 }
 
@@ -43,10 +32,9 @@ func (dbc *dbManager) getTraceSignals() (result getTraceSignalsResult, err error
 
 	var signals []traceSignal
 
-	rows, err := dbc.getDb().Query(`
-	SELECT id, uri, method FROM metadata_trace;`)
+	rows, err := dbc.getDb().Query(TRACESIGNAL_QUERY)
 	if err != nil {
-		log.Errorf("DB Query for metadata_trace failed %v", err)
+		log.Errorf("DB Query \"%s\" failed %v", TRACESIGNAL_DB_QUERY, err)
 		return
 	}
 	defer rows.Close()

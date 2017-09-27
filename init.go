@@ -2,7 +2,7 @@ package apidGatewayTrace
 
 import (
   "sync"
-  "github.com/30x/apid-core"
+  "github.com/apid/apid-core"
 )
 
 var (
@@ -12,11 +12,10 @@ var (
 
 )
 
-func initPlugin(s apid.Services) (apid.PluginData, error) {
-  services = s
+func initPlugin(services apid.Services) (apid.PluginData, error) {
   log = services.Log().ForModule("apidGatewayTrace")
   config = services.Config()
-  log.Debug("Initializing apidGatewayTrace")
+  log.Debugf("Initializing %s", pluginData.Name)
   dbMan := &dbManager{
     data:  services.Data(),
     dbMux: sync.RWMutex{},

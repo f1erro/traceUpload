@@ -13,11 +13,6 @@ import (
 	"bytes"
 )
 
-type errorResponse struct {
-	ErrorCode int    `json:"errorCode"`
-	Reason    string `json:"reason"`
-}
-
 const (
 	API_ERR_BAD_BLOCK 		= iota + 1
 	API_ERR_INTERNAL
@@ -27,34 +22,6 @@ const (
 	maxIdleConnsPerHost              = 50
 	httpTimeout                      = time.Minute
 )
-
-type apiManagerInterface interface {
-	InitAPI()
-	notifyChange(interface{})
-
-}
-
-type traceSignal struct {
-	Id     string `json:"id"`
-	Uri    string `json:"uri"`
-	Method string `json:"method"`
-}
-
-type getTraceSignalsResult struct {
-	Signals []traceSignal `json:"signals"`
-	Err     error `json:"error"`
-}
-
-type apiManager struct {
-	signalEndpoint string
-	uploadEndpoint        string
-	dbMan dbManagerInterface
-	apiInitialized      bool
-	newSignal  chan interface{}
-	addSubscriber       chan chan getTraceSignalsResult
-	removeSubscriber    chan chan getTraceSignalsResult
-
-}
 
 func (a *apiManager) InitAPI() {
 	if a.apiInitialized {
@@ -77,7 +44,8 @@ func (a *apiManager) distributeEvents() {
 		select {
 		case _, ok := <-a.newSignal: //once we debounce, use different channel
 			if !ok {
-				return // todo: using this?
+				log.Errof("Error encountered attempting to distribute trace events: %v", ok)
+				return
 			}
 			subs := subscribers
 			subscribers = make(map[chan getTraceSignalsResult]struct{})
@@ -195,7 +163,7 @@ func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.
 			return nil
 		},
 	}
-	blobMetadata := createBlobMetadata{}
+	blobMetadata := blobCreationMetadata{}
 	sessionId := r.Header.Get("X-Apigee-Debug-ID")
 	if sessionId != "" && (len(strings.Split(sessionId, "__")) == 5){
 		sessionIdComponents := strings.Split(sessionId, "__")
@@ -242,7 +210,7 @@ func (a *apiManager) writeInternalError(w http.ResponseWriter, err string) {
 	a.writeError(w, http.StatusInternalServerError, API_ERR_INTERNAL, err)
 }
 
-func getSignedURL(client *http.Client, blobMetadata createBlobMetadata, blobServerURL string) (string, error) {
+func getSignedURL(client *http.Client, blobMetadata blobCreationMetadata, blobServerURL string) (string, error) {
 
 	blobUri, err := url.Parse(blobServerURL)
 	if err != nil {
@@ -294,7 +262,7 @@ func uploadToBlobstore(client *http.Client, uriString string, data io.Reader) (*
 	return res, nil
 }
 
-func postWithAuth(client *http.Client, uriString string, blobMetadata createBlobMetadata) (io.ReadCloser, error) {
+func postWithAuth(client *http.Client, uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error) {
 
 	b, err := json.Marshal(blobMetadata)
 	if err != nil {

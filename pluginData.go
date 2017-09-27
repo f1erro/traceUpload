@@ -1,6 +1,6 @@
 package apidGatewayTrace
 
-import "github.com/30x/apid-core"
+import "github.com/apid/apid-core"
 
 var pluginData = apid.PluginData{
 	Name:    "apidGatewayTrace",

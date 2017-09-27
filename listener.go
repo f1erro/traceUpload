@@ -1,18 +1,14 @@
 package apidGatewayTrace
 
 import (
-	"github.com/30x/apid-core"
+	"github.com/apid/apid-core"
 	"github.com/apigee-labs/transicator/common"
 )
 
-type apigeeSyncHandler struct {
-	dbMan     dbManagerInterface
-	apiMan    apiManagerInterface
-	closed    bool
-}
-
 const (
 	APIGEE_SYNC_EVENT     = "ApigeeSync"
+	TRACESIGNAL_PG_TABLENAME     = "metadata.trace"
+
 )
 
 func (h *apigeeSyncHandler) initListener(services apid.Services) {
@@ -20,7 +16,7 @@ func (h *apigeeSyncHandler) initListener(services apid.Services) {
 }
 
 func (h *apigeeSyncHandler) String() string {
-	return "gatewayTrace"
+	return pluginData.Name
 }
 
 func (h *apigeeSyncHandler) Handle(e apid.Event) {
@@ -53,13 +49,13 @@ func (h *apigeeSyncHandler) processChangeList(changes *common.ChangeList) {
 	// changes have been applied to DB
 	for _, change := range changes.Changes {
 		switch change.Table {
-		case "metadata.trace":
+		case TRACESIGNAL_PG_TABLENAME:
 			h.apiMan.notifyChange(true)
 			switch change.Operation {
 			case common.Insert:
 			case common.Delete:
 			case common.Update:
-				log.Error("Update operation on table metadata.trace not supported")
+				log.Errorf("Update operation on table %s not supported", TRACESIGNAL_PG_TABLENAME)
 			default:
 				log.Errorf("unexpected operation: %s", change.Operation)
 			}

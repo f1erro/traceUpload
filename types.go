@@ -1,7 +1,14 @@
 package apidGatewayTrace
 
+import "sync"
 
-type createBlobMetadata struct {
+type errorResponse struct {
+	ErrorCode int    `json:"errorCode"`
+	Reason    string `json:"reason"`
+}
+
+//blobstore types
+type blobCreationMetadata struct {
 	Customer    	string `json:"customer"`
 	Environment 	string `json:"environment"`
 	Organization 	string `json:"organization"`
@@ -21,25 +28,51 @@ type blobServerResponse struct {
 	Customer		 string `json:"customer"`
 }
 
-func getTestBlobMetadata() createBlobMetadata {
-	return createBlobMetadata{
-		Customer: "hybrid",
-		Environment: "test",
-		Organization: "hybrid",
-	}
+//listener types
+type apigeeSyncHandler struct {
+	dbMan     dbManagerInterface
+	apiMan    apiManagerInterface
+	closed    bool
 }
 
-/*
-        addMutation(mw, "BlobId", blob.getId(), true, null);
-        addMutation(mw, "Customer", blob.getCustomer(), true, null);
-        addMutation(mw, "Environment", blob.getEnvironment(), false, null);
-        addMutation(mw, "Organization", blob.getOrganization(), false, null);
-        addMutation(mw, "Store", blob.getStore(), true, DEFAULT_STORE);
-        addMutation(mw, "ContentType", blob.getContentType(), true, DEFAULT_CONTENT_TYPE);
+//data management types
+type dbManagerInterface interface {
+	setDbVersion(string)
+	initDb() error
+	getTraceSignals() (result getTraceSignalsResult, err error)
+}
 
-        if (blob.getTags() != null) {
-            mw.set("Tags").toStringArray(blob.getTags());
-        } else {
-            mw.set("Tags").toStringArray(Collections.EMPTY_LIST);
-        }
- */
+type dbManager struct {
+	data  apid.DataService
+	db    apid.DB
+	dbMux sync.RWMutex
+}
+
+type traceSignal struct {
+	Id     string `json:"id"`
+	Uri    string `json:"uri"`
+	Method string `json:"method"`
+}
+
+type getTraceSignalsResult struct {
+	Signals []traceSignal `json:"signals"`
+	Err     error `json:"error"`
+}
+
+//api implementation types
+type apiManagerInterface interface {
+	InitAPI()
+	notifyChange(interface{})
+
+}
+
+type apiManager struct {
+	signalEndpoint string
+	uploadEndpoint        string
+	dbMan dbManagerInterface
+	apiInitialized      bool
+	newSignal  chan interface{}
+	addSubscriber       chan chan getTraceSignalsResult
+	removeSubscriber    chan chan getTraceSignalsResult
+
+}
