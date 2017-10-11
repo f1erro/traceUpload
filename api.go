@@ -80,13 +80,12 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 	}
 	log.Debugf("api timeout: %d", timeout)
 
-	// If If-None-Match is a csv of active debug
+	// If-None-Match is a csv of active debug session IDs
 	ifNoneMatch := r.Header.Get("If-None-Match")
 	log.Debugf("if-none-match: %s", ifNoneMatch)
 
 	// send unmodified if matches prior eTag and no timeout
 	result, err := a.dbMan.getTraceSignals()
-	//ignore an error here
 	if err == nil && ifNoneMatch != ""{
 		existingTraceSessions := make(map[string]bool)
 		newTraceSessions := make([]traceSignal, 0)
@@ -111,7 +110,7 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 	// otherwise, subscribe to any new deployment changes
 	var newDeploymentsChannel chan getTraceSignalsResult
 	newDeploymentsChannel = make(chan getTraceSignalsResult, 1)
-	a.addSubscriber <- newDeploymentsChannel // getting blocked here
+	a.addSubscriber <- newDeploymentsChannel
 
 	log.Debug("Blocking request... Waiting for new trace signals.")
 

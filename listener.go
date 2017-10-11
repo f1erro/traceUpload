@@ -31,7 +31,7 @@ func (h *apigeeSyncHandler) Handle(e apid.Event) {
 }
 
 
-//todo handle case where trace signal comes in during new snapshot (not boot)
+//todo handle case where trace signal comes in during new snapshot (not boot). need to debounce
 func (h *apigeeSyncHandler) processSnapshot(snapshot *common.Snapshot) {
 
 	log.Debugf("Snapshot received. Switching to DB version: %s", snapshot.SnapshotInfo)
