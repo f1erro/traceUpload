@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	API_ERR_BAD_BLOCK 		= iota + 1
+	API_ERR_BAD_BLOCK 			= iota + 1
 	API_ERR_INTERNAL
-	blobStoreUri 			= "/blobs"
+	blobStoreUri 				= "/blobs"
 	configBearerToken       	= "apigeesync_bearer_token"
-	configBlobServerBaseURI         = "apigeesync_blob_server_base"
-	maxIdleConnsPerHost              = 50
-	httpTimeout                      = time.Minute
+	configBlobServerBaseURI     = "apigeesync_blob_server_base"
+	maxIdleConnsPerHost         = 50
+	httpTimeout                 = time.Minute
 )
 
 func (a *apiManager) InitAPI() {
@@ -42,9 +42,9 @@ func (a *apiManager) distributeEvents() {
 
 	for {
 		select {
-		case _, ok := <-a.newSignal: //once we debounce, use different channel
+		case _, ok := <-a.newSignal:
 			if !ok {
-				log.Errof("Error encountered attempting to distribute trace events: %v", ok)
+				log.Errorf("Error encountered attempting to distribute trace events: %v", ok)
 				return
 			}
 			subs := subscribers
@@ -87,21 +87,31 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 	// send unmodified if matches prior eTag and no timeout
 	result, err := a.dbMan.getTraceSignals()
 	if err == nil && ifNoneMatch != ""{
-		existingTraceSessions := make(map[string]bool)
-		newTraceSessions := make([]traceSignal, 0)
+		clientTraceSessionExistence := make(map[string]bool)
+		apidTraceSessionExistence := make(map[string]bool)
 		for _, id := range strings.Split(ifNoneMatch, ",") {
-			existingTraceSessions[id] = true
+			clientTraceSessionExistence[id] = true
 		}
+
 		for _, signal := range result.Signals {
-			if (!existingTraceSessions[signal.Id]) {
-				newTraceSessions = append(newTraceSessions, signal)
+			//append here for deletion check to come
+			apidTraceSessionExistence[signal.Id] = true
+
+			//check for new trace signals
+			if (!clientTraceSessionExistence[signal.Id]) {
+				a.sendTheseTraceSignals(w, result)
+				return
+			}
+		}
+		for id := range clientTraceSessionExistence {
+			//check for deleted trace signal. If deleted, we should response to update the state
+			if (!apidTraceSessionExistence[id]) {
+				a.sendTheseTraceSignals(w, result)
+				return
 			}
 		}
 
-		if len(newTraceSessions) > 0 {
-			a.sendTraceSignals(w,  getTraceSignalsResult{Signals: newTraceSessions})
-			return
-		} else if (timeout == 0) {
+		if (timeout == 0) {
 			w.WriteHeader(http.StatusNotModified)
 			return
 		}
@@ -119,7 +129,7 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 		if result.Err != nil {
 			a.writeInternalError(w, "Database error")
 		} else {
-			a.sendTraceSignals(w, result)
+			a.sendTheseTraceSignals(w, result)
 		}
 
 	case <-time.After(time.Duration(timeout) * time.Second):
@@ -128,17 +138,30 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 		if ifNoneMatch != "" {
 			w.WriteHeader(http.StatusNotModified)
 		} else {
-			result, err := a.dbMan.getTraceSignals()
-			if err != nil {
-				a.writeInternalError(w, "Database error")
-			} else {
-				a.sendTraceSignals(w, result)
-			}
+			a.sendAllTraceSignals(w)
 		}
 	}
 }
 
-func (a *apiManager) sendTraceSignals(w http.ResponseWriter, result getTraceSignalsResult) {
+func (a *apiManager) sendTheseTraceSignals(w http.ResponseWriter, result getTraceSignalsResult) {
+	b, err := json.Marshal(result)
+	if err != nil {
+		log.Errorf("unable to marshal deployments: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(b)
+
+}
+
+func (a *apiManager) sendAllTraceSignals(w http.ResponseWriter) {
+
+	result, err := a.dbMan.getTraceSignals()
+	if err != nil {
+		a.writeInternalError(w, "Database error")
+		return
+	}
 
 	b, err := json.Marshal(result)
 	if err != nil {

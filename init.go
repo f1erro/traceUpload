@@ -48,6 +48,6 @@ func initPlugin(services apid.Services) (apid.PluginData, error) {
 }
 
 func init() {
-  apid.RegisterPlugin(initPlugin)
+  apid.RegisterPlugin(initPlugin, pluginData)
 }
 

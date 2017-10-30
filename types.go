@@ -1,6 +1,9 @@
 package apidGatewayTrace
 
-import "sync"
+import (
+	"sync"
+	"github.com/apid/apid-core"
+)
 
 type errorResponse struct {
 	ErrorCode int    `json:"errorCode"`

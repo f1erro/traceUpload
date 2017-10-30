@@ -32,7 +32,7 @@ func (dbc *dbManager) getTraceSignals() (result getTraceSignalsResult, err error
 
 	var signals []traceSignal
 
-	rows, err := dbc.getDb().Query(TRACESIGNAL_QUERY)
+	rows, err := dbc.getDb().Query(TRACESIGNAL_DB_QUERY)
 	if err != nil {
 		log.Errorf("DB Query \"%s\" failed %v", TRACESIGNAL_DB_QUERY, err)
 		return
