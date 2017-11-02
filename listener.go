@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	APIGEE_SYNC_EVENT     = "ApigeeSync"
+	APIGEE_SYNC_EVENT     		 = "ApigeeSync"
 	TRACESIGNAL_PG_TABLENAME     = "metadata.trace"
 
 )

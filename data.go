@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	TRACESIGNAL_DB_QUERY    = `SELECT id, uri, method FROM metadata_trace;`
+	TRACESIGNAL_DB_QUERY    = `SELECT id, uri FROM metadata_trace;`
 )
 
 func (dbc *dbManager) setDbVersion(version string) {
@@ -30,7 +30,7 @@ func (dbc *dbManager) initDb() error {
 
 func (dbc *dbManager) getTraceSignals() (result getTraceSignalsResult, err error) {
 
-	var signals []traceSignal
+	signals := make([]traceSignal, 0)
 
 	rows, err := dbc.getDb().Query(TRACESIGNAL_DB_QUERY)
 	if err != nil {
@@ -39,12 +39,12 @@ func (dbc *dbManager) getTraceSignals() (result getTraceSignalsResult, err error
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var id, uri, method string
-		err = rows.Scan(&id, &uri, &method)
+		var id, uri string
+		err = rows.Scan(&id, &uri)
 		if err != nil {
 			return getTraceSignalsResult{Err: err}, err
 		}
-		signals = append(signals, traceSignal{Id: id, Uri: uri, Method: method})
+		signals = append(signals, traceSignal{Id: id, Uri: uri})
 	}
 
 	result.Signals = signals

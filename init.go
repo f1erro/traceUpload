@@ -12,7 +12,8 @@ var (
 
 )
 
-func initPlugin(services apid.Services) (apid.PluginData, error) {
+func initPlugin(s apid.Services) (apid.PluginData, error) {
+  services = s
   log = services.Log().ForModule("apidGatewayTrace")
   config = services.Config()
   log.Debugf("Initializing %s", pluginData.Name)

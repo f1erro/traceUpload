@@ -54,7 +54,6 @@ type dbManager struct {
 type traceSignal struct {
 	Id     string `json:"id"`
 	Uri    string `json:"uri"`
-	Method string `json:"method"`
 }
 
 type getTraceSignalsResult struct {
