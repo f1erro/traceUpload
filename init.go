@@ -12,10 +12,14 @@ var (
 
 )
 
-func initPlugin(s apid.Services) (apid.PluginData, error) {
+func initServices(s apid.Services) {
   services = s
   log = services.Log().ForModule("apidGatewayTrace")
   config = services.Config()
+}
+
+func initPlugin(s apid.Services) (apid.PluginData, error) {
+  initServices(s)
   log.Debugf("Initializing %s", pluginData.Name)
   dbMan := &dbManager{
     data:  services.Data(),

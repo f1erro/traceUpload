@@ -30,7 +30,6 @@ func (h *apigeeSyncHandler) Handle(e apid.Event) {
 	}
 }
 
-
 //todo handle case where trace signal comes in during new snapshot (not boot). need to debounce
 func (h *apigeeSyncHandler) processSnapshot(snapshot *common.Snapshot) {
 
@@ -50,10 +49,11 @@ func (h *apigeeSyncHandler) processChangeList(changes *common.ChangeList) {
 	for _, change := range changes.Changes {
 		switch change.Table {
 		case TRACESIGNAL_PG_TABLENAME:
-			h.apiMan.notifyChange(true)
 			switch change.Operation {
 			case common.Insert:
+				h.apiMan.notifyChange(true)
 			case common.Delete:
+				h.apiMan.notifyChange(true)
 			case common.Update:
 				log.Errorf("Update operation on table %s not supported", TRACESIGNAL_PG_TABLENAME)
 			default:
@@ -62,12 +62,3 @@ func (h *apigeeSyncHandler) processChangeList(changes *common.ChangeList) {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-
