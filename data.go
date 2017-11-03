@@ -38,6 +38,7 @@ func (dbc *dbManager) getTraceSignals() (result getTraceSignalsResult, err error
 		return
 	}
 	defer rows.Close()
+	//TODO: I added a new feature in https://github.com/apid/apid-core/pull/27 You can try it once it's merged :-)
 	for rows.Next() {
 		var id, uri, method string
 		err = rows.Scan(&id, &uri, &method)

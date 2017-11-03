@@ -36,7 +36,7 @@ func (a *apiManager) InitAPI() {
 func (a *apiManager) notifyChange(arg interface{}) {
 	a.newSignal <- arg
 }
-
+// TODO in fact this is already in https://github.com/apid/apid-core/blob/master/util/util.go#L37
 func (a *apiManager) distributeEvents() {
 	subscribers := make(map[chan getTraceSignalsResult]struct{})
 
@@ -83,16 +83,25 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 	// If-None-Match is a csv of active debug session IDs
 	ifNoneMatch := r.Header.Get("If-None-Match")
 	log.Debugf("if-none-match: %s", ifNoneMatch)
+	//TODO: What if "block" is given but "If-None-Match" is not?
+	//TODO: from my understanding, if ifNoneMatch=="", we should return immediately and ignore this timeout
 
 	// send unmodified if matches prior eTag and no timeout
 	result, err := a.dbMan.getTraceSignals()
+	//TODO: add err!=nil check and maybe return 500
 	if err == nil && ifNoneMatch != ""{
 		clientTraceSessionExistence := make(map[string]bool)
 		apidTraceSessionExistence := make(map[string]bool)
+		/* TODO: This func is too long. We may want a func like: "func needToSend (signalIds []string, clientTraceSessions []string) bool"
+		* TODO: Call it like:
+			if needToSend(signalIds, strings.Split(ifNoneMatch, ",")) {
+				a.sendTheseTraceSignals(w, result)
+			}
+		*/
 		for _, id := range strings.Split(ifNoneMatch, ",") {
 			clientTraceSessionExistence[id] = true
 		}
-
+		//TODO: It looks like you're comparing two maps, and sendTheseTraceSignals if they mismatch, try reflect.DeepEqual
 		for _, signal := range result.Signals {
 			//append here for deletion check to come
 			apidTraceSessionExistence[signal.Id] = true
@@ -138,16 +147,18 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 		if ifNoneMatch != "" {
 			w.WriteHeader(http.StatusNotModified)
 		} else {
+			//TODO: from my understanding, if ifNoneMatch=="", we should return immediately without waiting for this timeout
 			a.sendAllTraceSignals(w)
 		}
 	}
 }
-
+//TODO: add header content-type: application/json
 func (a *apiManager) sendTheseTraceSignals(w http.ResponseWriter, result getTraceSignalsResult) {
 	b, err := json.Marshal(result)
 	if err != nil {
 		log.Errorf("unable to marshal deployments: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		//TODO: call a.writeInternalError. json may succeed writing error,even if this json.Marshal failed.
 		return
 	}
 
@@ -166,6 +177,7 @@ func (a *apiManager) sendAllTraceSignals(w http.ResponseWriter) {
 	b, err := json.Marshal(result)
 	if err != nil {
 		log.Errorf("unable to marshal deployments: %v", err)
+		//TODO: call a.writeInternalError. json may succeed writing error, even if this json.Marshal failed.
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -174,19 +186,24 @@ func (a *apiManager) sendAllTraceSignals(w http.ResponseWriter) {
 }
 
 func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.Request) {
+	//TODO defer r.Body.Close()
 	// initialize tracker client
+	//TODO: https://golang.org/pkg/net/http/ : Clients and Transports are safe for concurrent use by multiple goroutines and for efficiency should only be created once and re-used.
+
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost: maxIdleConnsPerHost,
 		},
 		Timeout: httpTimeout,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			//TODO: not sure if we should use Header.Add. In hybrid, this "Authorization' header may be also used by customer firewall/proxy. Not sure.
 			req.Header.Set("Authorization", getBearerToken())
 			return nil
 		},
 	}
 	blobMetadata := blobCreationMetadata{}
 	sessionId := r.Header.Get("X-Apigee-Debug-ID")
+	//TODO: strings.Split is called twice here. We can reduce it to 1.
 	if sessionId != "" && (len(strings.Split(sessionId, "__")) == 5){
 		sessionIdComponents := strings.Split(sessionId, "__")
 		blobMetadata.Customer = sessionIdComponents[0]
@@ -194,6 +211,7 @@ func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.
 		blobMetadata.Environment = sessionIdComponents[1]
 		blobMetadata.Tags = []string {sessionIdComponents[4], sessionId}
 	} else {
+		//TODO: use http.statusXXX constant
 		a.writeError(w, 400, 400, fmt.Sprintf("Bad value for required header X-Apigee-Debug-ID: %s", sessionId))
 		return
 	}
@@ -204,6 +222,7 @@ func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.
 	} else {
 		res, err := uploadToBlobstore(httpClient, s, r.Body)
 		if err != nil {
+			//TODO: This err seems to be apid error, should return 500 and hide 401 from clients
 			w.WriteHeader(401)
 
 		} else {
@@ -221,6 +240,7 @@ func (a *apiManager) writeError(w http.ResponseWriter, status int, code int, rea
 	}
 	bytes, err := json.Marshal(e)
 	if err != nil {
+		//TODO: we can write a []byte("json marshal error") in case json error
 		log.Errorf("unable to marshal errorResponse: %v", err)
 	} else {
 		w.Write(bytes)
@@ -279,6 +299,7 @@ func uploadToBlobstore(client *http.Client, uriString string, data io.Reader) (*
 	}
 	if res.StatusCode != 200 && res.StatusCode != 201 {
 		res.Body.Close()
+		//TODO: log.Error()
 		return nil, fmt.Errorf("POST uri %s failed with status %d", uriString, res.StatusCode)
 	}
 	return res, nil
