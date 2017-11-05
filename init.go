@@ -28,12 +28,12 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 
   apiMan := &apiManager{
     dbMan: dbMan,
+    bsClient: &blobstoreClient{},
     signalEndpoint: "/tracesignals",
     uploadEndpoint: "/uploadTrace",
     apiInitialized: false,
     newSignal: make(chan interface{}),
-    addSubscriber: make(chan chan getTraceSignalsResult),
-    removeSubscriber: make(chan chan getTraceSignalsResult),
+    addSubscriber: make(chan chan interface{}),
   }
 
   // initialize event handler
@@ -44,8 +44,6 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
   }
 
   eventHandler.initListener(services)
-
-  go apiMan.distributeEvents()
 
   log.Debug("end init")
 

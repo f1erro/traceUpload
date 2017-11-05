@@ -11,11 +11,16 @@ import (
 	"fmt"
 	"net/url"
 	"bytes"
+	"github.com/apid/apid-core/util"
 )
 
 const (
 	API_ERR_BAD_BLOCK 			= iota + 1
 	API_ERR_INTERNAL
+	API_ERR_DB_ERROR
+	API_ERR_BAD_DATA_MARSHALL
+	API_ERR_BAD_DEBUG_HEADER
+	API_ERR_BLOBSTORE
 	blobStoreUri 				= "/blobs"
 	configBearerToken       	= "apigeesync_bearer_token"
 	configBlobServerBaseURI     = "apigeesync_blob_server_base"
@@ -30,41 +35,12 @@ func (a *apiManager) InitAPI() {
 	services.API().HandleFunc(a.signalEndpoint, a.apiGetTraceSignalEndpoint).Methods("GET")
 	services.API().HandleFunc(a.uploadEndpoint, a.apiUploadTraceDataEndpoint).Methods("POST")
 	a.apiInitialized = true
+	go util.DistributeEvents(a.newSignal, a.addSubscriber)
 	log.Debug("API endpoints initialized")
 }
 
 func (a *apiManager) notifyChange(arg interface{}) {
 	a.newSignal <- arg
-}
-
-func (a *apiManager) distributeEvents() {
-	subscribers := make(map[chan getTraceSignalsResult]struct{})
-
-	for {
-		select {
-		case _, ok := <-a.newSignal:
-			if !ok {
-				log.Errorf("Error encountered attempting to distribute trace events: %v", ok)
-				return
-			}
-			subs := subscribers
-			subscribers = make(map[chan getTraceSignalsResult]struct{})
-			go func() {
-				traceSignals, _ := a.dbMan.getTraceSignals()
-				log.Debugf("delivering trace signals to %d subscribers", len(subs))
-				for subscriber := range subs {
-					log.Debugf("delivering to: %v", subscriber)
-					subscriber <- traceSignals
-				}
-			}()
-		case subscriber := <-a.addSubscriber:
-			log.Debugf("Add subscriber: %v", subscriber)
-			subscribers[subscriber] = struct{}{}
-		case subscriber := <-a.removeSubscriber:
-			log.Debugf("Remove subscriber: %v", subscriber)
-			delete(subscribers, subscriber)
-		}
-	}
 }
 
 func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.Request) {
@@ -84,89 +60,55 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 	ifNoneMatch := r.Header.Get("If-None-Match")
 	log.Debugf("if-none-match: %s", ifNoneMatch)
 
+	if ifNoneMatch == ""{
+		a.sendTraceSignals(nil, w)
+		return
+	}
+
 	// send unmodified if matches prior eTag and no timeout
 	result, err := a.dbMan.getTraceSignals()
-	if err == nil && ifNoneMatch != ""{
-		clientTraceSessionExistence := make(map[string]bool)
-		apidTraceSessionExistence := make(map[string]bool)
-		for _, id := range strings.Split(ifNoneMatch, ",") {
-			clientTraceSessionExistence[id] = true
-		}
+	if err != nil {
 
-		for _, signal := range result.Signals {
-			//append here for deletion check to come
-			apidTraceSessionExistence[signal.Id] = true
+	}
 
-			//check for new trace signals
-			if (!clientTraceSessionExistence[signal.Id]) {
-				a.sendTheseTraceSignals(w, result)
-				return
-			}
-		}
-		for id := range clientTraceSessionExistence {
-			//check for deleted trace signal. If deleted, we should response to update the state
-			if (!apidTraceSessionExistence[id]) {
-				a.sendTheseTraceSignals(w, result)
-				return
-			}
-		}
+	if (additionOrDeletionDetected(result, ifNoneMatch)) {
+		a.sendTraceSignals(result, w)
+		return
+	}
 
-		if (timeout == 0) {
-			w.WriteHeader(http.StatusNotModified)
+	if (timeout == 0) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	log.Debug("Blocking request... Waiting for new trace signals.")
+	util.LongPolling(w, time.Duration(timeout)*time.Second, a.addSubscriber, a.sendTraceSignals, a.LongPollTimeoutHandler)
+
+}
+
+func (a *apiManager) LongPollTimeoutHandler(w http.ResponseWriter) {
+	log.Debug("long-polling tracesignals request timed out.")
+	w.WriteHeader(http.StatusNotModified)
+}
+
+func (a *apiManager) sendTraceSignals(signals interface{}, w http.ResponseWriter) {
+
+	var result getTraceSignalsResult
+	if signals != nil {
+		result = signals.(getTraceSignalsResult)
+	} else {
+		var err error
+		result, err = a.dbMan.getTraceSignals()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, API_ERR_DB_ERROR, err.Error())
 			return
 		}
 	}
 
-	// otherwise, subscribe to any new deployment changes
-	var newDeploymentsChannel chan getTraceSignalsResult
-	newDeploymentsChannel = make(chan getTraceSignalsResult, 1)
-	a.addSubscriber <- newDeploymentsChannel
-
-	log.Debug("Blocking request... Waiting for new trace signals.")
-
-	select {
-	case result := <-newDeploymentsChannel:
-		if result.Err != nil {
-			a.writeInternalError(w, "Database error")
-		} else {
-			a.sendTheseTraceSignals(w, result)
-		}
-
-	case <-time.After(time.Duration(timeout) * time.Second):
-		a.removeSubscriber <- newDeploymentsChannel
-		log.Debug("Blocking deployment request timed out.")
-		if ifNoneMatch != "" {
-			w.WriteHeader(http.StatusNotModified)
-		} else {
-			a.sendAllTraceSignals(w)
-		}
-	}
-}
-
-func (a *apiManager) sendTheseTraceSignals(w http.ResponseWriter, result getTraceSignalsResult) {
 	b, err := json.Marshal(result)
 	if err != nil {
-		log.Errorf("unable to marshal deployments: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Write(b)
-
-}
-
-func (a *apiManager) sendAllTraceSignals(w http.ResponseWriter) {
-
-	result, err := a.dbMan.getTraceSignals()
-	if err != nil {
-		a.writeInternalError(w, "Database error")
-		return
-	}
-
-	b, err := json.Marshal(result)
-	if err != nil {
-		log.Errorf("unable to marshal deployments: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Errorf("unable to marshal trace signals: %v", err)
+		writeError(w, http.StatusInternalServerError, API_ERR_BAD_DATA_MARSHALL, "Unable to marshal trace signals")
 		return
 	}
 
@@ -194,18 +136,19 @@ func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.
 		blobMetadata.Environment = sessionIdComponents[1]
 		blobMetadata.Tags = []string {sessionIdComponents[4], sessionId}
 	} else {
-		a.writeError(w, 400, 400, fmt.Sprintf("Bad value for required header X-Apigee-Debug-ID: %s", sessionId))
+		writeError(w, 400, API_ERR_BAD_DEBUG_HEADER, fmt.Sprintf("Bad value for required header X-Apigee-Debug-ID: %s", sessionId))
 		return
 	}
 
 	s, err := getSignedURL(httpClient, blobMetadata, config.GetString(configBlobServerBaseURI))
 	if err != nil {
-		w.WriteHeader(500)
+		log.Errorf("Unable to fetch signed upload URL: %v", err)
+		writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable fetch signed upload URL")
 	} else {
 		res, err := uploadToBlobstore(httpClient, s, r.Body)
 		if err != nil {
-			w.WriteHeader(401)
-
+			log.Errorf("Unable to use signed url for upload: %v", err)
+			writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable to use signed url for upload")
 		} else {
 			w.WriteHeader(res.StatusCode)
 			w.Write([]byte("Successfully uploaded trace to blobstore"))
@@ -213,7 +156,7 @@ func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.
 	}
 }
 
-func (a *apiManager) writeError(w http.ResponseWriter, status int, code int, reason string) {
+func writeError(w http.ResponseWriter, status int, code int, reason string) {
 	w.WriteHeader(status)
 	e := errorResponse{
 		ErrorCode: code,
@@ -228,87 +171,28 @@ func (a *apiManager) writeError(w http.ResponseWriter, status int, code int, rea
 	log.Debugf("sending %d error to client: %s", status, reason)
 }
 
-func (a *apiManager) writeInternalError(w http.ResponseWriter, err string) {
-	a.writeError(w, http.StatusInternalServerError, API_ERR_INTERNAL, err)
-}
-
-func getSignedURL(client *http.Client, blobMetadata blobCreationMetadata, blobServerURL string) (string, error) {
-
-	blobUri, err := url.Parse(blobServerURL)
-	if err != nil {
-		log.Panicf("bad url value for config %s: %s", blobUri, err)
+func additionOrDeletionDetected(result getTraceSignalsResult, ifNoneMatch string) bool {
+	clientTraceSessionExistence := make(map[string]bool)
+	apidTraceSessionExistence := make(map[string]bool)
+	for _, id := range strings.Split(ifNoneMatch, ",") {
+		clientTraceSessionExistence[id] = true
 	}
 
-	blobUri.Path += blobStoreUri
-	uri := blobUri.String()
+	for _, signal := range result.Signals {
+		//append here for deletion check to come
+		apidTraceSessionExistence[signal.Id] = true
 
-	surl, err := postWithAuth(client, uri, blobMetadata)
-	if err != nil {
-		log.Errorf("Unable to get signed URL from BlobServer %s: %v", uri, err)
-		return "", err
+		//check for new trace signals
+		if (!clientTraceSessionExistence[signal.Id]) {
+			return true;
+		}
 	}
-	defer surl.Close()
-
-	body, err := ioutil.ReadAll(surl)
-	if err != nil {
-		log.Errorf("Invalid response from BlobServer for {%s} error: {%v}", uri, err)
-		return "", err
-	}
-	res := blobServerResponse{}
-	err = json.Unmarshal(body, &res)
-	log.Debugf("%+v\n", res)
-	if err != nil {
-		log.Errorf("Invalid response from BlobServer for {%s} error: {%v}", uri, err)
-		return "", err
+	for id := range clientTraceSessionExistence {
+		//check for deleted trace signal. If deleted, we should response to update the state
+		if (!apidTraceSessionExistence[id]) {
+			return true;
+		}
 	}
 
-
-	return res.SignedUrl, nil
-}
-
-func uploadToBlobstore(client *http.Client, uriString string, data io.Reader) (*http.Response, error){
-	req, err := http.NewRequest("PUT", uriString, data)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", "application/octet-stream")
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != 200 && res.StatusCode != 201 {
-		res.Body.Close()
-		return nil, fmt.Errorf("POST uri %s failed with status %d", uriString, res.StatusCode)
-	}
-	return res, nil
-}
-
-func postWithAuth(client *http.Client, uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error) {
-
-	b, err := json.Marshal(blobMetadata)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to marshal blob metadata for blob %v", blobMetadata)
-	}
-
-	req, err := http.NewRequest("POST", uriString, bytes.NewReader(b))
-	if err != nil {
-		return nil, err
-	}
-	// add Auth
-	req.Header.Add("Authorization", getBearerToken())
-	req.Header.Add("Content-Type", "application/json")
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != 200 && res.StatusCode != 201 {
-		res.Body.Close()
-		return nil, fmt.Errorf("POST uri %s failed with status %d", uriString, res.StatusCode)
-	}
-	return res.Body, nil
-}
-
-func getBearerToken() string {
-	return "Bearer " + config.GetString(configBearerToken)
+	return false
 }

@@ -3,11 +3,23 @@ package apidGatewayTrace
 import (
 	"sync"
 	"github.com/apid/apid-core"
+	"net/http"
+	"io"
 )
 
 type errorResponse struct {
 	ErrorCode int    `json:"errorCode"`
 	Reason    string `json:"reason"`
+}
+
+type blobstoreClientInterface interface {
+  getSignedURL(client *http.Client,  metadata blobCreationMetadata, blobServerURL string) (string, error)
+  uploadToBlobstore(client *http.Client, uriString string, data io.Reader) (*http.Response, error)
+  postWithAuth(client *http.Client, uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error)
+}
+
+type blobstoreClient struct {
+
 }
 
 //blobstore types
@@ -38,6 +50,23 @@ type apigeeSyncHandler struct {
 	closed    bool
 }
 
+//api implementation types
+type apiManagerInterface interface {
+	InitAPI()
+	notifyChange(interface{})
+}
+
+type apiManager struct {
+	signalEndpoint 		string
+	uploadEndpoint      string
+	dbMan 				dbManagerInterface
+	bsClient			blobstoreClientInterface
+	apiInitialized      bool
+	newSignal  		    chan interface{}
+	addSubscriber       chan chan interface{}
+
+}
+
 //data management types
 type dbManagerInterface interface {
 	setDbVersion(string)
@@ -59,22 +88,4 @@ type traceSignal struct {
 type getTraceSignalsResult struct {
 	Signals []traceSignal `json:"signals"`
 	Err     error `json:"error"`
-}
-
-//api implementation types
-type apiManagerInterface interface {
-	InitAPI()
-	notifyChange(interface{})
-
-}
-
-type apiManager struct {
-	signalEndpoint string
-	uploadEndpoint        string
-	dbMan dbManagerInterface
-	apiInitialized      bool
-	newSignal  chan interface{}
-	addSubscriber       chan chan getTraceSignalsResult
-	removeSubscriber    chan chan getTraceSignalsResult
-
 }
