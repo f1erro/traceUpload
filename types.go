@@ -19,7 +19,7 @@ type blobstoreClientInterface interface {
 }
 
 type blobstoreClient struct {
-
+	httpClient *http.Client
 }
 
 //blobstore types

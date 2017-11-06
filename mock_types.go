@@ -5,6 +5,7 @@ import (
 	//"database/sql"
 	//"time"
 	//"github.com/apid/apid-core"
+	"net/http"
 )
 
 /* Mock API Manager */
@@ -40,3 +41,13 @@ func (m *mockDbManager) getTraceSignals() (getTraceSignalsResult, error) {
 	args := m.Called()
 	return args.Get(0).(getTraceSignalsResult), args.Error(1)
 }
+
+/* Mock Blobstore client */
+type mockBlobstoreClient struct {
+	mock.Mock
+	mockBlobstoreClient
+}
+
+func (bc *mockBlobstoreClient) getSignedURL(client *http.Client, blobMetadata blobCreationMetadata, blobServerURL string) (string, error) {
+}
+

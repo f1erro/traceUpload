@@ -112,17 +112,6 @@ func (a *apiManager) sendTraceSignals(signals interface{}, w http.ResponseWriter
 }
 
 func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.Request) {
-	// initialize tracker client
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: maxIdleConnsPerHost,
-		},
-		Timeout: httpTimeout,
-		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			req.Header.Set("Authorization", getBearerToken())
-			return nil
-		},
-	}
 	blobMetadata := blobCreationMetadata{}
 	sessionId := r.Header.Get("X-Apigee-Debug-ID")
 	if sessionId != "" && (len(strings.Split(sessionId, "__")) == 5){

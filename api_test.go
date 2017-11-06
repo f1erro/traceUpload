@@ -141,22 +141,7 @@ var _ = Describe("API Implementation", func() {
 		})
 
 		It("should return 304 after long polling for specified time", func() {
-			r := httptest.NewRequest("GET", "/tracesignals?block=5", nil)
-			w := httptest.NewRecorder()
-			r.Header.Add("If-None-Match", "0,1,2,3,4")
-			apiMan := apiManager{
-				dbMan: dbMan,
-				newSignal: make(chan interface{}),
-				addSubscriber: make(chan chan interface{}),
-			}
-			apiMan.InitAPI()
-			apiMan.apiGetTraceSignalEndpoint(w, r)
-			<-time.After(5 * time.Second)
-			Expect(w.Code).To(Equal(304))
-		})
-
-		It("should return all tracesignals after change is detected", func() {
-			r := httptest.NewRequest("GET", "/tracesignals?block=5", nil)
+			r := httptest.NewRequest("GET", "/tracesignals?block=2", nil)
 			w := httptest.NewRecorder()
 			w.Code = 0
 			r.Header.Add("If-None-Match", "0,1,2,3,4")
@@ -166,12 +151,31 @@ var _ = Describe("API Implementation", func() {
 				addSubscriber: make(chan chan interface{}),
 			}
 			apiMan.InitAPI()
-			apiMan.apiGetTraceSignalEndpoint(w, r)
+			go apiMan.apiGetTraceSignalEndpoint(w, r)
+			<-time.After(500 * time.Millisecond)
+			Expect(w.Code).To(Equal(0))
+			<-time.After(2 * time.Second)
+			Expect(w.Code).To(Equal(304))
+		})
+
+		It("should return all tracesignals after change is detected", func() {
+			r := httptest.NewRequest("GET", "/tracesignals?block=2", nil)
+			w := httptest.NewRecorder()
+			w.Code = 0
+			r.Header.Add("If-None-Match", "0,1,2,3,4")
+			apiMan := apiManager{
+				dbMan: dbMan,
+				newSignal: make(chan interface{}),
+				addSubscriber: make(chan chan interface{}),
+				apiInitialized: false,
+			}
+			apiMan.InitAPI()
+			go apiMan.apiGetTraceSignalEndpoint(w, r)
 			<-time.After(1 * time.Second)
-			//Expect(w.Code).To(Equal(0)) //has not completed yet
-			_, err := dbMan.db.Exec("INSERT into metadata_trace (id, uri) VALUES('5', '/uri5');") //delete 4
+			Expect(w.Code).To(Equal(0)) //has not completed yet
+			_, err := dbMan.db.Exec("INSERT into metadata_trace (id, uri) VALUES('5', 'uri5');") //delete 4
 			Expect(err).To(Succeed())
-			apiMan.newSignal <- true
+			apiMan.notifyChange(nil)
 			<-time.After(1 * time.Second)
 			Expect(w.Code).To(Equal(200))
 			res := w.Body
@@ -185,8 +189,6 @@ var _ = Describe("API Implementation", func() {
 				Expect(signal.Id).To(Equal(strconv.Itoa(index)))
 				Expect(signal.Uri).To(Equal("uri" + strconv.Itoa(index)))
 			}
-
-
 		})
 	})
 
