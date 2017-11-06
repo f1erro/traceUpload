@@ -5,17 +5,17 @@ import (
 
 	"net/http/httptest"
 
-	. "github.com/onsi/gomega"
-	"io/ioutil"
-	"sync"
-	"github.com/stretchr/testify/mock"
-	"net/http"
-	"io"
-	"strings"
-	"time"
 	"encoding/json"
-	"strconv"
 	"errors"
+	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 )
 
 var _ = Describe("API Implementation", func() {
@@ -46,10 +46,10 @@ var _ = Describe("API Implementation", func() {
 
 			go apiMan.notifyChange(true)
 			select {
-				case <-apiMan.newSignal:
-					return
-				case <-time.After(100*time.Millisecond):
-					Fail("APIManager failed to notify change channel of change")
+			case <-apiMan.newSignal:
+				return
+			case <-time.After(100 * time.Millisecond):
+				Fail("APIManager failed to notify change channel of change")
 			}
 		})
 
@@ -151,8 +151,8 @@ var _ = Describe("API Implementation", func() {
 			w.Code = 0
 			r.Header.Add("If-None-Match", "0,1,2,3,4")
 			apiMan := apiManager{
-				dbMan: dbMan,
-				newSignal: make(chan interface{}),
+				dbMan:         dbMan,
+				newSignal:     make(chan interface{}),
 				addSubscriber: make(chan chan interface{}),
 			}
 			apiMan.InitAPI()
@@ -169,15 +169,15 @@ var _ = Describe("API Implementation", func() {
 			w.Code = 0
 			r.Header.Add("If-None-Match", "0,1,2,3,4")
 			apiMan := apiManager{
-				dbMan: dbMan,
-				newSignal: make(chan interface{}),
-				addSubscriber: make(chan chan interface{}),
+				dbMan:          dbMan,
+				newSignal:      make(chan interface{}),
+				addSubscriber:  make(chan chan interface{}),
 				apiInitialized: false,
 			}
 			apiMan.InitAPI()
 			go apiMan.apiGetTraceSignalEndpoint(w, r)
 			<-time.After(1 * time.Second)
-			Expect(w.Code).To(Equal(0)) //has not completed yet
+			Expect(w.Code).To(Equal(0))                                                          //has not completed yet
 			_, err := dbMan.db.Exec("INSERT into metadata_trace (id, uri) VALUES('5', 'uri5');") //delete 4
 			Expect(err).To(Succeed())
 			apiMan.notifyChange(nil)
@@ -197,12 +197,12 @@ var _ = Describe("API Implementation", func() {
 		})
 	})
 
-		Context("Upload Tracesignals API", func() {
-			var mockBsClient mockBlobstoreClient;
-			BeforeEach(func() {
-				mockBsClient = mockBlobstoreClient{}
-			})
-			It("should return 400 if debug session header is missing", func() {
+	Context("Upload Tracesignals API", func() {
+		var mockBsClient mockBlobstoreClient
+		BeforeEach(func() {
+			mockBsClient = mockBlobstoreClient{}
+		})
+		It("should return 400 if debug session header is missing", func() {
 			r := httptest.NewRequest("POST", "/uploadTrace", nil)
 			w := httptest.NewRecorder()
 			apiMan := apiManager{}
@@ -251,26 +251,24 @@ var _ = Describe("API Implementation", func() {
 
 		})
 
-			It("should return 200 on success, and more generally any response code from blobstore", func() {
-				var body io.Reader = strings.NewReader("a trace")
-				r := httptest.NewRequest("POST", "/uploadTrace", body)
-				r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
-				w := httptest.NewRecorder()
-				w.Code = 0
-				apiMan := apiManager{
-					bsClient: &mockBsClient,
-				}
-				mockBsClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
-				mockBsClient.On("uploadToBlobstore", "testurl", r.Body).Return(&http.Response{StatusCode: 200}, nil)
+		It("should return 200 on success, and more generally any response code from blobstore", func() {
+			var body io.Reader = strings.NewReader("a trace")
+			r := httptest.NewRequest("POST", "/uploadTrace", body)
+			r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
+			w := httptest.NewRecorder()
+			w.Code = 0
+			apiMan := apiManager{
+				bsClient: &mockBsClient,
+			}
+			mockBsClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
+			mockBsClient.On("uploadToBlobstore", "testurl", r.Body).Return(&http.Response{StatusCode: 200}, nil)
 
-				apiMan.apiUploadTraceDataEndpoint(w, r)
-				Expect(w.Code).To(Equal(200))
+			apiMan.apiUploadTraceDataEndpoint(w, r)
+			Expect(w.Code).To(Equal(200))
 
+		})
 
-
-			})
-
-			It("should copy response from blobstore", func() {
+		It("should copy response from blobstore", func() {
 			r := httptest.NewRequest("POST", "/uploadTrace", nil)
 			r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
 			w := httptest.NewRecorder()
@@ -285,28 +283,28 @@ var _ = Describe("API Implementation", func() {
 			Expect(w.Code).To(Equal(401))
 		})
 
-		})
+	})
 
-		Context("API Manager Util function tests", func() {
-			It("should detect the deletion of a trace signal", func() {
-				ifNoneMatchHeader := "1,2,7"
-				traceSignalsResult := getTraceSignalsResult{}
-				traceSignalsResult.Signals = []traceSignal{{Id: "1"}, {Id: "2"}, {Id: "7"}}
-				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
+	Context("API Manager Util function tests", func() {
+		It("should detect the deletion of a trace signal", func() {
+			ifNoneMatchHeader := "1,2,7"
+			traceSignalsResult := getTraceSignalsResult{}
+			traceSignalsResult.Signals = []traceSignal{{Id: "1"}, {Id: "2"}, {Id: "7"}}
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
 
-				//test white space in between commas is ignored
-				ifNoneMatchHeader = "1, 2, 7"
-				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
+			//test white space in between commas is ignored
+			ifNoneMatchHeader = "1, 2, 7"
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
 
-				ifNoneMatchHeader = "1,2"
-				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
+			ifNoneMatchHeader = "1,2"
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
 
-				ifNoneMatchHeader = "1,2,7,8"
-				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
+			ifNoneMatchHeader = "1,2,7,8"
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
 
-				ifNoneMatchHeader = "2,7,8"
-				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
+			ifNoneMatchHeader = "2,7,8"
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
 
-			})
 		})
 	})
+})

@@ -6,9 +6,8 @@ import (
 )
 
 const (
-	APIGEE_SYNC_EVENT     		 = "ApigeeSync"
-	TRACESIGNAL_PG_TABLENAME     = "metadata.trace"
-
+	APIGEE_SYNC_EVENT        = "ApigeeSync"
+	TRACESIGNAL_PG_TABLENAME = "metadata.trace"
 )
 
 func (h *apigeeSyncHandler) initListener(services apid.Services) {

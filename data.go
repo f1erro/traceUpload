@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	TRACESIGNAL_DB_QUERY    = `SELECT id, uri FROM metadata_trace;`
+	TRACESIGNAL_DB_QUERY = `SELECT id, uri FROM metadata_trace;`
 )
 
 func (dbc *dbManager) setDbVersion(version string) {

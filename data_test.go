@@ -1,6 +1,5 @@
 package apidGatewayTrace
 
-
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -8,8 +7,8 @@ import (
 	"github.com/apid/apid-core"
 	//"github.com/apid/apid-core/factory"
 	"io/ioutil"
-	"sync"
 	"strconv"
+	"sync"
 )
 
 var _ = Describe("DBManager", func() {

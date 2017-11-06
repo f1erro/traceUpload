@@ -1,12 +1,12 @@
 package apidGatewayTrace
 
 import (
-	. "github.com/onsi/ginkgo"
-	"testing"
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"os"
+	"testing"
 )
 
 const testTempDirBase = "./tmp/"

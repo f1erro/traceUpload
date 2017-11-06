@@ -1,28 +1,28 @@
 package apidGatewayTrace
 
 import (
-	"net/http"
 	"encoding/json"
-	"strconv"
-	"time"
-	"strings"
 	"fmt"
 	"github.com/apid/apid-core/util"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 )
 
 const (
-	API_ERR_BAD_BLOCK 			= iota + 1
+	API_ERR_BAD_BLOCK = iota + 1
 	API_ERR_INTERNAL
 	API_ERR_DB_ERROR
 	API_ERR_BAD_DATA_MARSHALL
 	API_ERR_BAD_DEBUG_HEADER
 	API_ERR_BLOBSTORE
-	blobStoreUri 				= "/blobs"
-	configBearerToken       	= "apigeesync_bearer_token"
-	configBlobServerBaseURI     = "apigeesync_blob_server_base"
-	maxIdleConnsPerHost         = 50
-	httpTimeout                 = time.Minute
-	UPLOAD_TRACESESSION_HEADER  = "X-Apigee-Debug-ID"
+	blobStoreUri               = "/blobs"
+	configBearerToken          = "apigeesync_bearer_token"
+	configBlobServerBaseURI    = "apigeesync_blob_server_base"
+	maxIdleConnsPerHost        = 50
+	httpTimeout                = time.Minute
+	UPLOAD_TRACESESSION_HEADER = "X-Apigee-Debug-ID"
 )
 
 func (a *apiManager) InitAPI() {
@@ -40,7 +40,7 @@ func (a *apiManager) notifyChange(arg interface{}) {
 	a.newSignal <- arg
 }
 
-func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.Request) {
+func (a *apiManager) apiGetTraceSignalEndpoint(w http.ResponseWriter, r *http.Request) {
 	b := r.URL.Query().Get("block")
 	var timeout int
 	if b != "" {
@@ -57,7 +57,7 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 	ifNoneMatch := r.Header.Get("If-None-Match")
 	log.Debugf("if-none-match: %s", ifNoneMatch)
 
-	if ifNoneMatch == ""{
+	if ifNoneMatch == "" {
 		a.sendTraceSignals(nil, w)
 		return
 	}
@@ -68,12 +68,12 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 
 	}
 
-	if (additionOrDeletionDetected(result, ifNoneMatch)) {
+	if additionOrDeletionDetected(result, ifNoneMatch) {
 		a.sendTraceSignals(result, w)
 		return
 	}
 
-	if (timeout == 0) {
+	if timeout == 0 {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
@@ -112,15 +112,15 @@ func (a *apiManager) sendTraceSignals(signals interface{}, w http.ResponseWriter
 	w.Write(b)
 }
 
-func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.Request) {
+func (a *apiManager) apiUploadTraceDataEndpoint(w http.ResponseWriter, r *http.Request) {
 	blobMetadata := blobCreationMetadata{}
 	sessionId := r.Header.Get(UPLOAD_TRACESESSION_HEADER)
-	if sessionId != "" && (len(strings.Split(sessionId, "__")) == 5){
+	if sessionId != "" && (len(strings.Split(sessionId, "__")) == 5) {
 		sessionIdComponents := strings.Split(sessionId, "__")
 		blobMetadata.Customer = sessionIdComponents[0]
 		blobMetadata.Organization = sessionIdComponents[0]
 		blobMetadata.Environment = sessionIdComponents[1]
-		blobMetadata.Tags = []string {sessionIdComponents[4], sessionId}
+		blobMetadata.Tags = []string{sessionIdComponents[4], sessionId}
 	} else {
 		writeError(w, 400, API_ERR_BAD_DEBUG_HEADER, fmt.Sprintf("Bad value for required header X-Apigee-Debug-ID: %s", sessionId))
 		return
@@ -168,13 +168,13 @@ func additionOrDeletionDetected(result getTraceSignalsResult, ifNoneMatch string
 		apidTraceSessionExistence[signal.Id] = true
 
 		//check for new trace signals
-		if (!clientTraceSessionExistence[signal.Id]) {
+		if !clientTraceSessionExistence[signal.Id] {
 			return true
 		}
 	}
 	for id := range clientTraceSessionExistence {
 		//check for deleted trace signal. If deleted, we should response to update the state
-		if (!apidTraceSessionExistence[id]) {
+		if !apidTraceSessionExistence[id] {
 			return true
 		}
 	}

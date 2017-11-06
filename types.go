@@ -1,10 +1,10 @@
 package apidGatewayTrace
 
 import (
-	"sync"
 	"github.com/apid/apid-core"
-	"net/http"
 	"io"
+	"net/http"
+	"sync"
 )
 
 type errorResponse struct {
@@ -13,9 +13,9 @@ type errorResponse struct {
 }
 
 type blobstoreClientInterface interface {
-  getSignedURL(metadata blobCreationMetadata, blobServerURL string) (string, error)
-  uploadToBlobstore(uriString string, data io.ReadCloser) (*http.Response, error)
-  postWithAuth(uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error)
+	getSignedURL(metadata blobCreationMetadata, blobServerURL string) (string, error)
+	uploadToBlobstore(uriString string, data io.ReadCloser) (*http.Response, error)
+	postWithAuth(uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error)
 }
 
 type blobstoreClient struct {
@@ -24,30 +24,30 @@ type blobstoreClient struct {
 
 //blobstore types
 type blobCreationMetadata struct {
-	Customer    	string `json:"customer"`
-	Environment 	string `json:"environment"`
-	Organization 	string `json:"organization"`
-	Tags 		[]string `json:"tags"`
+	Customer     string   `json:"customer"`
+	Environment  string   `json:"environment"`
+	Organization string   `json:"organization"`
+	Tags         []string `json:"tags"`
 }
 
 type blobServerResponse struct {
-	Id                       string `json:"id"`
-	Kind                     string `json:"kind"`
-	Self                     string `json:"self"`
-	SignedUrl                string `json:"signedurl"`
-	SignedUrlExpiryTimestamp string `json:"signedurlexpirytimestamp"`
-	Tags			 []string `json:"tags"`
-	Store 			 string `json:"store"`
-	Organization		 string `json"organization"`
-	ContentType		 string `json:"contentType"`
-	Customer		 string `json:"customer"`
+	Id                       string   `json:"id"`
+	Kind                     string   `json:"kind"`
+	Self                     string   `json:"self"`
+	SignedUrl                string   `json:"signedurl"`
+	SignedUrlExpiryTimestamp string   `json:"signedurlexpirytimestamp"`
+	Tags                     []string `json:"tags"`
+	Store                    string   `json:"store"`
+	Organization             string   `json"organization"`
+	ContentType              string   `json:"contentType"`
+	Customer                 string   `json:"customer"`
 }
 
 //listener types
 type apigeeSyncHandler struct {
-	dbMan     dbManagerInterface
-	apiMan    apiManagerInterface
-	closed    bool
+	dbMan  dbManagerInterface
+	apiMan apiManagerInterface
+	closed bool
 }
 
 //api implementation types
@@ -57,14 +57,13 @@ type apiManagerInterface interface {
 }
 
 type apiManager struct {
-	signalEndpoint 		string
-	uploadEndpoint      string
-	dbMan 				dbManagerInterface
-	bsClient			blobstoreClientInterface
-	apiInitialized      bool
-	newSignal  		    chan interface{}
-	addSubscriber       chan chan interface{}
-
+	signalEndpoint string
+	uploadEndpoint string
+	dbMan          dbManagerInterface
+	bsClient       blobstoreClientInterface
+	apiInitialized bool
+	newSignal      chan interface{}
+	addSubscriber  chan chan interface{}
 }
 
 //data management types
@@ -81,11 +80,11 @@ type dbManager struct {
 }
 
 type traceSignal struct {
-	Id     string `json:"id"`
-	Uri    string `json:"uri"`
+	Id  string `json:"id"`
+	Uri string `json:"uri"`
 }
 
 type getTraceSignalsResult struct {
 	Signals []traceSignal `json:"signals"`
-	Err     error `json:"error"`
+	Err     error         `json:"error"`
 }

@@ -5,8 +5,8 @@ import (
 	//"database/sql"
 	//"time"
 	//"github.com/apid/apid-core"
-	"net/http"
 	"io"
+	"net/http"
 )
 
 /* Mock API Manager */
@@ -23,7 +23,6 @@ func (m *mockApiManager) notifyChange(change interface{}) {
 	m.Called(change)
 }
 
-
 /* Mock DB Manager */
 type mockDbManager struct {
 	mock.Mock
@@ -33,7 +32,7 @@ func (m *mockDbManager) setDbVersion(version string) {
 	m.Called(version)
 }
 
-func (m *mockDbManager) initDb() error{
+func (m *mockDbManager) initDb() error {
 	args := m.Called()
 	return args.Error(0)
 }
@@ -59,9 +58,8 @@ func (bc *mockBlobstoreClient) postWithAuth(uriString string, blobMetadata blobC
 	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
-func (bc *mockBlobstoreClient) uploadToBlobstore(uriString string, data io.ReadCloser) (*http.Response, error){
+func (bc *mockBlobstoreClient) uploadToBlobstore(uriString string, data io.ReadCloser) (*http.Response, error) {
 	args := bc.Called(uriString, data)
 	return args.Get(0).(*http.Response), args.Error(1)
 
 }
-

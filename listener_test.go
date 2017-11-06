@@ -1,8 +1,8 @@
 package apidGatewayTrace
 
 import (
-	. "github.com/onsi/ginkgo"
 	"github.com/apigee-labs/transicator/common"
+	. "github.com/onsi/ginkgo"
 )
 
 var _ = Describe("Listener", func() {
@@ -17,7 +17,7 @@ var _ = Describe("Listener", func() {
 			dbManager.On("setDbVersion", "testSnapshotId").Return()
 
 			handler := apigeeSyncHandler{
-				dbMan: dbManager,
+				dbMan:  dbManager,
 				apiMan: apiManager,
 				closed: false,
 			}
@@ -31,7 +31,7 @@ var _ = Describe("Listener", func() {
 			apiManager := new(mockApiManager)
 			apiManager.On("notifyChange", true)
 			handler := apigeeSyncHandler{
-				dbMan: nil,
+				dbMan:  nil,
 				apiMan: apiManager,
 				closed: false,
 			}

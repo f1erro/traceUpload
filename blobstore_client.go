@@ -1,13 +1,13 @@
 package apidGatewayTrace
 
 import (
-	"net/url"
-	"io/ioutil"
-	"encoding/json"
-	"io"
-	"fmt"
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 )
 
 func (bc *blobstoreClient) getSignedURL(blobMetadata blobCreationMetadata, blobServerURL string) (string, error) {
@@ -40,11 +40,10 @@ func (bc *blobstoreClient) getSignedURL(blobMetadata blobCreationMetadata, blobS
 		return "", err
 	}
 
-
 	return res.SignedUrl, nil
 }
 
-func (bc *blobstoreClient) uploadToBlobstore(uriString string, data io.ReadCloser) (*http.Response, error){
+func (bc *blobstoreClient) uploadToBlobstore(uriString string, data io.ReadCloser) (*http.Response, error) {
 	req, err := http.NewRequest("PUT", uriString, data)
 	if err != nil {
 		return nil, err
