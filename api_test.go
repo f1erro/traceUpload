@@ -11,12 +11,11 @@ import (
 	"sync"
 	"encoding/json"
 	"strconv"
-	"fmt"
 )
 
 var _ = Describe("API Implementation", func() {
 
-	Context("unit tests", func() {
+	Context("API Manager Tests", func() {
 
 		var dataTestTempDir string
 		var dbMan *dbManager
@@ -36,7 +35,6 @@ var _ = Describe("API Implementation", func() {
 		})
 
 		It("should send notifications to correct channel", func() {
-			fmt.Println("should send notifications to correct channel")
 			apiMan := apiManager{
 				newSignal: make(chan interface{}),
 			}
@@ -51,7 +49,6 @@ var _ = Describe("API Implementation", func() {
 		})
 
 		It("should error on bad block value", func() {
-			fmt.Println("should error on bad block value")
 			apiMan := apiManager{}
 			r := httptest.NewRequest("GET", "/tracesignals?block=abc", nil)
 			w := httptest.NewRecorder()
@@ -60,7 +57,6 @@ var _ = Describe("API Implementation", func() {
 		})
 
 		It("should return all traces signals if If-None-Match header is not present", func() {
-			fmt.Println("should return all traces signals if If-None-Match header is not present")
 			r := httptest.NewRequest("GET", "/tracesignals?block=5", nil)
 			w := httptest.NewRecorder()
 
@@ -82,20 +78,17 @@ var _ = Describe("API Implementation", func() {
 			}
 		})
 
-		It("should detect a deletion", func() {
-			fmt.Println("should detect a deletion")
+		It("should detect the deletion of a trace signal", func() {
 			r := httptest.NewRequest("GET", "/tracesignals?block=5", nil)
 			w := httptest.NewRecorder()
-			r.Header.Add("If-None-Match", "0, 1, 2, 3") //delete 4
-			_, err := dbMan.db.Exec("DELETE from metadata_trace WHERE id='4'")
+			r.Header.Add("If-None-Match", "0, 1, 2, 3, 4")
+			_, err := dbMan.db.Exec("DELETE from metadata_trace WHERE id='4'") //delete 4
 			Expect(err).To(Succeed())
 			apiMan := apiManager{
 				dbMan: dbMan,
 			}
 
 			apiMan.apiGetTraceSignalEndpoint(w, r)
-			fmt.Println("here")
-
 			Expect(w.Code).To(Equal(200))
 			res := w.Body
 			signals := &getTraceSignalsResult{}
@@ -108,6 +101,114 @@ var _ = Describe("API Implementation", func() {
 				Expect(signal.Id).To(Equal(strconv.Itoa(index)))
 				Expect(signal.Uri).To(Equal("uri" + strconv.Itoa(index)))
 			}
+
+		})
+
+		It("should detect the addition of a trace signal", func() {
+			r := httptest.NewRequest("GET", "/tracesignals?block=5", nil)
+			w := httptest.NewRecorder()
+			r.Header.Add("If-None-Match", "2,3,4")
+			apiMan := apiManager{
+				dbMan: dbMan,
+			}
+
+			apiMan.apiGetTraceSignalEndpoint(w, r)
+			Expect(w.Code).To(Equal(200))
+			res := w.Body
+			signals := &getTraceSignalsResult{}
+			err := json.Unmarshal(res.Bytes(), signals)
+			Expect(err).To(Succeed())
+			Expect(signals.Err).To(Succeed())
+			Expect(signals.Signals).ToNot(BeNil())
+			Expect(len(signals.Signals)).To(Equal(5))
+			for index, signal := range signals.Signals {
+				Expect(signal.Id).To(Equal(strconv.Itoa(index)))
+				Expect(signal.Uri).To(Equal("uri" + strconv.Itoa(index)))
+			}
+
+		})
+
+		It("should return 304 if no changes detected and block param not provided", func() {
+			r := httptest.NewRequest("GET", "/tracesignals", nil)
+			w := httptest.NewRecorder()
+			r.Header.Add("If-None-Match", "0,1,2,3,4")
+			apiMan := apiManager{
+				dbMan: dbMan,
+			}
+
+			apiMan.apiGetTraceSignalEndpoint(w, r)
+			Expect(w.Code).To(Equal(304))
+		})
+
+		It("should return 304 after long polling for specified time", func() {
+			r := httptest.NewRequest("GET", "/tracesignals?block=5", nil)
+			w := httptest.NewRecorder()
+			r.Header.Add("If-None-Match", "0,1,2,3,4")
+			apiMan := apiManager{
+				dbMan: dbMan,
+				newSignal: make(chan interface{}),
+				addSubscriber: make(chan chan interface{}),
+			}
+			apiMan.InitAPI()
+			apiMan.apiGetTraceSignalEndpoint(w, r)
+			<-time.After(5 * time.Second)
+			Expect(w.Code).To(Equal(304))
+		})
+
+		It("should return all tracesignals after change is detected", func() {
+			r := httptest.NewRequest("GET", "/tracesignals?block=5", nil)
+			w := httptest.NewRecorder()
+			w.Code = 0
+			r.Header.Add("If-None-Match", "0,1,2,3,4")
+			apiMan := apiManager{
+				dbMan: dbMan,
+				newSignal: make(chan interface{}),
+				addSubscriber: make(chan chan interface{}),
+			}
+			apiMan.InitAPI()
+			apiMan.apiGetTraceSignalEndpoint(w, r)
+			<-time.After(1 * time.Second)
+			//Expect(w.Code).To(Equal(0)) //has not completed yet
+			_, err := dbMan.db.Exec("INSERT into metadata_trace (id, uri) VALUES('5', '/uri5');") //delete 4
+			Expect(err).To(Succeed())
+			apiMan.newSignal <- true
+			<-time.After(1 * time.Second)
+			Expect(w.Code).To(Equal(200))
+			res := w.Body
+			signals := &getTraceSignalsResult{}
+			err = json.Unmarshal(res.Bytes(), signals)
+			Expect(err).To(Succeed())
+			Expect(signals.Err).To(Succeed())
+			Expect(signals.Signals).ToNot(BeNil())
+			Expect(len(signals.Signals)).To(Equal(6))
+			for index, signal := range signals.Signals {
+				Expect(signal.Id).To(Equal(strconv.Itoa(index)))
+				Expect(signal.Uri).To(Equal("uri" + strconv.Itoa(index)))
+			}
+
+
+		})
+	})
+
+	Context("API Manager Util function tests", func() {
+		It("should detect the deletion of a trace signal", func() {
+			ifNoneMatchHeader := "1,2,7"
+			traceSignalsResult := getTraceSignalsResult{}
+			traceSignalsResult.Signals = []traceSignal{{Id: "1"}, {Id: "2"}, {Id: "7"}}
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
+
+			//test white space in between commas is ignored
+			ifNoneMatchHeader = "1, 2, 7"
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
+
+			ifNoneMatchHeader = "1,2"
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
+
+			ifNoneMatchHeader = "1,2,7,8"
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
+
+			ifNoneMatchHeader = "2,7,8"
+			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
 
 		})
 	})
