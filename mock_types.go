@@ -59,7 +59,7 @@ func (bc *mockBlobstoreClient) postWithAuth(uriString string, blobMetadata blobC
 	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
-func (bc *mockBlobstoreClient) uploadToBlobstore(uriString string, data io.Reader) (*http.Response, error){
+func (bc *mockBlobstoreClient) uploadToBlobstore(uriString string, data io.ReadCloser) (*http.Response, error){
 	args := bc.Called(uriString, data)
 	return args.Get(0).(*http.Response), args.Error(1)
 

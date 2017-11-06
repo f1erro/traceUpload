@@ -2,18 +2,20 @@ package apidGatewayTrace
 
 import (
 	. "github.com/onsi/ginkgo"
-	//"github.com/apigee-labs/transicator/common"
-	"time"
+
 	"net/http/httptest"
 
 	. "github.com/onsi/gomega"
 	"io/ioutil"
 	"sync"
+	"github.com/stretchr/testify/mock"
+	"net/http"
+	"io"
+	"strings"
+	"time"
 	"encoding/json"
 	"strconv"
-	"github.com/stretchr/testify/mock"
 	"errors"
-	"net/http"
 )
 
 var _ = Describe("API Implementation", func() {
@@ -195,9 +197,12 @@ var _ = Describe("API Implementation", func() {
 		})
 	})
 
-	Context("Upload Tracesignals API", func() {
-		var mockBlobstoreClient = mockBlobstoreClient{}
-		It("should return 400 if debug session header is missing", func() {
+		Context("Upload Tracesignals API", func() {
+			var mockBsClient mockBlobstoreClient;
+			BeforeEach(func() {
+				mockBsClient = mockBlobstoreClient{}
+			})
+			It("should return 400 if debug session header is missing", func() {
 			r := httptest.NewRequest("POST", "/uploadTrace", nil)
 			w := httptest.NewRecorder()
 			apiMan := apiManager{}
@@ -222,9 +227,9 @@ var _ = Describe("API Implementation", func() {
 			w := httptest.NewRecorder()
 			w.Code = 0
 			apiMan := apiManager{
-				bsClient: &mockBlobstoreClient,
+				bsClient: &mockBsClient,
 			}
-			mockBlobstoreClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("", errors.New("can't get url"))
+			mockBsClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("", errors.New("can't get url"))
 			apiMan.apiUploadTraceDataEndpoint(w, r)
 			Expect(w.Code).To(Equal(500))
 
@@ -236,70 +241,72 @@ var _ = Describe("API Implementation", func() {
 			w := httptest.NewRecorder()
 			w.Code = 0
 			apiMan := apiManager{
-				bsClient: &mockBlobstoreClient,
+				bsClient: &mockBsClient,
 			}
-			mockBlobstoreClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
-			mockBlobstoreClient.On("uploadToBlobstore", "testurl", mock.AnythingOfType("io.Reader")).Return(nil, errors.New("can't upload"))
+			mockBsClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
+			mockBsClient.On("uploadToBlobstore", "testurl", r.Body).Return(&http.Response{}, errors.New("can't upload"))
 
 			apiMan.apiUploadTraceDataEndpoint(w, r)
 			Expect(w.Code).To(Equal(500))
 
 		})
 
-		It("should return 200 on success, and more generally any response code from blobstore", func() {
+			It("should return 200 on success, and more generally any response code from blobstore", func() {
+				var body io.Reader = strings.NewReader("a trace")
+				r := httptest.NewRequest("POST", "/uploadTrace", body)
+				r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
+				w := httptest.NewRecorder()
+				w.Code = 0
+				apiMan := apiManager{
+					bsClient: &mockBsClient,
+				}
+				mockBsClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
+				mockBsClient.On("uploadToBlobstore", "testurl", r.Body).Return(&http.Response{StatusCode: 200}, nil)
+
+				apiMan.apiUploadTraceDataEndpoint(w, r)
+				Expect(w.Code).To(Equal(200))
+
+
+
+			})
+
+			It("should copy response from blobstore", func() {
 			r := httptest.NewRequest("POST", "/uploadTrace", nil)
 			r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
 			w := httptest.NewRecorder()
 			w.Code = 0
 			apiMan := apiManager{
-				bsClient: &mockBlobstoreClient,
+				bsClient: &mockBsClient,
 			}
-			mockBlobstoreClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
-			mockBlobstoreClient.On("uploadToBlobstore", "testurl", mock.AnythingOfType("io.Reader")).Return(http.Response{StatusCode:200}, nil)
-
-			apiMan.apiUploadTraceDataEndpoint(w, r)
-			Expect(w.Code).To(Equal(200))
-
-		})
-
-		It("should copy response from blobstore", func() {
-			r := httptest.NewRequest("POST", "/uploadTrace", nil)
-			r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
-			w := httptest.NewRecorder()
-			w.Code = 0
-			apiMan := apiManager{
-				bsClient: &mockBlobstoreClient,
-			}
-			mockBlobstoreClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
-			mockBlobstoreClient.On("uploadToBlobstore", "testurl", mock.AnythingOfType("io.Reader")).Return(http.Response{StatusCode: 401}, nil)
+			mockBsClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
+			mockBsClient.On("uploadToBlobstore", "testurl", r.Body).Return(&http.Response{StatusCode: 401}, nil)
 
 			apiMan.apiUploadTraceDataEndpoint(w, r)
 			Expect(w.Code).To(Equal(401))
 		})
 
-	})
+		})
 
 		Context("API Manager Util function tests", func() {
-		It("should detect the deletion of a trace signal", func() {
-			ifNoneMatchHeader := "1,2,7"
-			traceSignalsResult := getTraceSignalsResult{}
-			traceSignalsResult.Signals = []traceSignal{{Id: "1"}, {Id: "2"}, {Id: "7"}}
-			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
+			It("should detect the deletion of a trace signal", func() {
+				ifNoneMatchHeader := "1,2,7"
+				traceSignalsResult := getTraceSignalsResult{}
+				traceSignalsResult.Signals = []traceSignal{{Id: "1"}, {Id: "2"}, {Id: "7"}}
+				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
 
-			//test white space in between commas is ignored
-			ifNoneMatchHeader = "1, 2, 7"
-			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
+				//test white space in between commas is ignored
+				ifNoneMatchHeader = "1, 2, 7"
+				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeFalse())
 
-			ifNoneMatchHeader = "1,2"
-			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
+				ifNoneMatchHeader = "1,2"
+				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
 
-			ifNoneMatchHeader = "1,2,7,8"
-			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
+				ifNoneMatchHeader = "1,2,7,8"
+				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
 
-			ifNoneMatchHeader = "2,7,8"
-			Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
+				ifNoneMatchHeader = "2,7,8"
+				Expect(additionOrDeletionDetected(traceSignalsResult, ifNoneMatchHeader)).To(BeTrue())
 
+			})
 		})
 	})
-
-})
