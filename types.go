@@ -13,9 +13,9 @@ type errorResponse struct {
 }
 
 type blobstoreClientInterface interface {
-  getSignedURL(client *http.Client,  metadata blobCreationMetadata, blobServerURL string) (string, error)
-  uploadToBlobstore(client *http.Client, uriString string, data io.Reader) (*http.Response, error)
-  postWithAuth(client *http.Client, uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error)
+  getSignedURL(metadata blobCreationMetadata, blobServerURL string) (string, error)
+  uploadToBlobstore(uriString string, data io.Reader) (*http.Response, error)
+  postWithAuth(uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error)
 }
 
 type blobstoreClient struct {

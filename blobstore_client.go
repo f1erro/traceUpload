@@ -10,7 +10,7 @@ import (
 	"net/http"
 )
 
-func (bc blobstoreClient) getSignedURL(client *http.Client, blobMetadata blobCreationMetadata, blobServerURL string) (string, error) {
+func (bc *blobstoreClient) getSignedURL(blobMetadata blobCreationMetadata, blobServerURL string) (string, error) {
 
 	blobUri, err := url.Parse(blobServerURL)
 	if err != nil {
@@ -20,7 +20,7 @@ func (bc blobstoreClient) getSignedURL(client *http.Client, blobMetadata blobCre
 	blobUri.Path += blobStoreUri
 	uri := blobUri.String()
 
-	surl, err := bc.postWithAuth(client, uri, blobMetadata)
+	surl, err := bc.postWithAuth(uri, blobMetadata)
 	if err != nil {
 		log.Errorf("Unable to get signed URL from BlobServer %s: %v", uri, err)
 		return "", err
@@ -44,14 +44,14 @@ func (bc blobstoreClient) getSignedURL(client *http.Client, blobMetadata blobCre
 	return res.SignedUrl, nil
 }
 
-func (bc *blobstoreClient) uploadToBlobstore(client *http.Client, uriString string, data io.Reader) (*http.Response, error){
+func (bc *blobstoreClient) uploadToBlobstore(uriString string, data io.Reader) (*http.Response, error){
 	req, err := http.NewRequest("PUT", uriString, data)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/octet-stream")
-	res, err := client.Do(req)
+	res, err := bc.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (bc *blobstoreClient) uploadToBlobstore(client *http.Client, uriString stri
 	return res, nil
 }
 
-func (bc *blobstoreClient) postWithAuth(client *http.Client, uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error) {
+func (bc *blobstoreClient) postWithAuth(uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error) {
 
 	b, err := json.Marshal(blobMetadata)
 	if err != nil {
@@ -76,7 +76,7 @@ func (bc *blobstoreClient) postWithAuth(client *http.Client, uriString string, b
 	// add Auth
 	req.Header.Add("Authorization", getBearerToken())
 	req.Header.Add("Content-Type", "application/json")
-	res, err := client.Do(req)
+	res, err := bc.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

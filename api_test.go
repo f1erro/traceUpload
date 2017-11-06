@@ -11,11 +11,14 @@ import (
 	"sync"
 	"encoding/json"
 	"strconv"
+	"github.com/stretchr/testify/mock"
+	"errors"
+	"net/http"
 )
 
 var _ = Describe("API Implementation", func() {
 
-	Context("API Manager Tests", func() {
+	Context("Get Tracesignals API", func() {
 
 		var dataTestTempDir string
 		var dbMan *dbManager
@@ -192,7 +195,91 @@ var _ = Describe("API Implementation", func() {
 		})
 	})
 
-	Context("API Manager Util function tests", func() {
+	Context("Upload Tracesignals API", func() {
+		var mockBlobstoreClient = mockBlobstoreClient{}
+		It("should return 400 if debug session header is missing", func() {
+			r := httptest.NewRequest("POST", "/uploadTrace", nil)
+			w := httptest.NewRecorder()
+			apiMan := apiManager{}
+			apiMan.apiUploadTraceDataEndpoint(w, r)
+			Expect(w.Code).To(Equal(400))
+
+		})
+
+		It("should return 400 if debug session header is invalid", func() {
+			r := httptest.NewRequest("POST", "/uploadTrace", nil)
+			r.Header.Add(UPLOAD_TRACESESSION_HEADER, "invalid")
+			w := httptest.NewRecorder()
+			apiMan := apiManager{}
+			apiMan.apiUploadTraceDataEndpoint(w, r)
+			Expect(w.Code).To(Equal(400))
+
+		})
+
+		It("should return 500 if cannot get signed upload url", func() {
+			r := httptest.NewRequest("POST", "/uploadTrace", nil)
+			r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
+			w := httptest.NewRecorder()
+			w.Code = 0
+			apiMan := apiManager{
+				bsClient: &mockBlobstoreClient,
+			}
+			mockBlobstoreClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("", errors.New("can't get url"))
+			apiMan.apiUploadTraceDataEndpoint(w, r)
+			Expect(w.Code).To(Equal(500))
+
+		})
+
+		It("should return 500 if cannot use upload URL", func() {
+			r := httptest.NewRequest("POST", "/uploadTrace", nil)
+			r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
+			w := httptest.NewRecorder()
+			w.Code = 0
+			apiMan := apiManager{
+				bsClient: &mockBlobstoreClient,
+			}
+			mockBlobstoreClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
+			mockBlobstoreClient.On("uploadToBlobstore", "testurl", mock.AnythingOfType("io.Reader")).Return(nil, errors.New("can't upload"))
+
+			apiMan.apiUploadTraceDataEndpoint(w, r)
+			Expect(w.Code).To(Equal(500))
+
+		})
+
+		It("should return 200 on success, and more generally any response code from blobstore", func() {
+			r := httptest.NewRequest("POST", "/uploadTrace", nil)
+			r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
+			w := httptest.NewRecorder()
+			w.Code = 0
+			apiMan := apiManager{
+				bsClient: &mockBlobstoreClient,
+			}
+			mockBlobstoreClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
+			mockBlobstoreClient.On("uploadToBlobstore", "testurl", mock.AnythingOfType("io.Reader")).Return(http.Response{StatusCode:200}, nil)
+
+			apiMan.apiUploadTraceDataEndpoint(w, r)
+			Expect(w.Code).To(Equal(200))
+
+		})
+
+		It("should copy response from blobstore", func() {
+			r := httptest.NewRequest("POST", "/uploadTrace", nil)
+			r.Header.Add(UPLOAD_TRACESESSION_HEADER, "org__env__app__rev__testID")
+			w := httptest.NewRecorder()
+			w.Code = 0
+			apiMan := apiManager{
+				bsClient: &mockBlobstoreClient,
+			}
+			mockBlobstoreClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
+			mockBlobstoreClient.On("uploadToBlobstore", "testurl", mock.AnythingOfType("io.Reader")).Return(http.Response{StatusCode: 401}, nil)
+
+			apiMan.apiUploadTraceDataEndpoint(w, r)
+			Expect(w.Code).To(Equal(401))
+		})
+
+	})
+
+		Context("API Manager Util function tests", func() {
 		It("should detect the deletion of a trace signal", func() {
 			ifNoneMatchHeader := "1,2,7"
 			traceSignalsResult := getTraceSignalsResult{}

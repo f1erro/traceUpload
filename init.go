@@ -3,6 +3,7 @@ package apidGatewayTrace
 import (
   "sync"
   "github.com/apid/apid-core"
+  "net/http"
 )
 
 var (
@@ -28,7 +29,18 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 
   apiMan := &apiManager{
     dbMan: dbMan,
-    bsClient: &blobstoreClient{},
+    bsClient: &blobstoreClient{
+        httpClient : &http.Client{
+          Transport: &http.Transport{
+            MaxIdleConnsPerHost: maxIdleConnsPerHost,
+          },
+          Timeout: httpTimeout,
+          CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+            req.Header.Set("Authorization", getBearerToken())
+            return nil
+          },
+        },
+    },
     signalEndpoint: "/tracesignals",
     uploadEndpoint: "/uploadTrace",
     apiInitialized: false,

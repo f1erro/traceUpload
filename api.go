@@ -22,6 +22,7 @@ const (
 	configBlobServerBaseURI     = "apigeesync_blob_server_base"
 	maxIdleConnsPerHost         = 50
 	httpTimeout                 = time.Minute
+	UPLOAD_TRACESESSION_HEADER  = "X-Apigee-Debug-ID"
 )
 
 func (a *apiManager) InitAPI() {
@@ -113,7 +114,7 @@ func (a *apiManager) sendTraceSignals(signals interface{}, w http.ResponseWriter
 
 func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.Request) {
 	blobMetadata := blobCreationMetadata{}
-	sessionId := r.Header.Get("X-Apigee-Debug-ID")
+	sessionId := r.Header.Get(UPLOAD_TRACESESSION_HEADER)
 	if sessionId != "" && (len(strings.Split(sessionId, "__")) == 5){
 		sessionIdComponents := strings.Split(sessionId, "__")
 		blobMetadata.Customer = sessionIdComponents[0]
@@ -125,18 +126,17 @@ func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.
 		return
 	}
 
-	s, err := a.bsClient.getSignedURL(httpClient, blobMetadata, config.GetString(configBlobServerBaseURI))
+	s, err := a.bsClient.getSignedURL(blobMetadata, config.GetString(configBlobServerBaseURI))
 	if err != nil {
 		log.Errorf("Unable to fetch signed upload URL: %v", err)
 		writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable fetch signed upload URL")
 	} else {
-		res, err := a.bsClient.uploadToBlobstore(httpClient, s, r.Body)
+		res, err := a.bsClient.uploadToBlobstore(s, r.Body)
 		if err != nil {
 			log.Errorf("Unable to use signed url for upload: %v", err)
 			writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable to use signed url for upload")
 		} else {
 			w.WriteHeader(res.StatusCode)
-			w.Write([]byte("Successfully uploaded trace to blobstore"))
 		}
 	}
 }

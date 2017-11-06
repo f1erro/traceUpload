@@ -6,6 +6,7 @@ import (
 	//"time"
 	//"github.com/apid/apid-core"
 	"net/http"
+	"io"
 )
 
 /* Mock API Manager */
@@ -45,9 +46,22 @@ func (m *mockDbManager) getTraceSignals() (getTraceSignalsResult, error) {
 /* Mock Blobstore client */
 type mockBlobstoreClient struct {
 	mock.Mock
-	mockBlobstoreClient
+	blobstoreClientInterface
 }
 
-func (bc *mockBlobstoreClient) getSignedURL(client *http.Client, blobMetadata blobCreationMetadata, blobServerURL string) (string, error) {
+func (bc *mockBlobstoreClient) getSignedURL(blobMetadata blobCreationMetadata, blobServerURL string) (string, error) {
+	args := bc.Called(blobMetadata, blobServerURL)
+	return args.String(0), args.Error(1)
+}
+
+func (bc *mockBlobstoreClient) postWithAuth(uriString string, blobMetadata blobCreationMetadata) (io.ReadCloser, error) {
+	args := bc.Called(uriString, blobMetadata)
+	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+func (bc *mockBlobstoreClient) uploadToBlobstore(uriString string, data io.Reader) (*http.Response, error){
+	args := bc.Called(uriString, data)
+	return args.Get(0).(*http.Response), args.Error(1)
+
 }
 
