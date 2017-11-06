@@ -10,6 +10,7 @@ import (
 /* Mock API Manager */
 type mockApiManager struct {
 	mock.Mock
+	apiManagerInterface
 }
 
 func (m *mockApiManager) InitAPI() {

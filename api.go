@@ -6,11 +6,7 @@ import (
 	"strconv"
 	"time"
 	"strings"
-	"io/ioutil"
-	"io"
 	"fmt"
-	"net/url"
-	"bytes"
 	"github.com/apid/apid-core/util"
 )
 
@@ -50,7 +46,7 @@ func (a *apiManager) apiGetTraceSignalEndpoint (w http.ResponseWriter, r *http.R
 		var err error
 		timeout, err = strconv.Atoi(b)
 		if err != nil {
-			a.writeError(w, http.StatusBadRequest, API_ERR_BAD_BLOCK, "bad block value, must be number of seconds")
+			writeError(w, http.StatusBadRequest, API_ERR_BAD_BLOCK, "bad block value, must be number of seconds")
 			return
 		}
 	}
@@ -140,12 +136,12 @@ func (a *apiManager) apiUploadTraceDataEndpoint (w http.ResponseWriter, r *http.
 		return
 	}
 
-	s, err := getSignedURL(httpClient, blobMetadata, config.GetString(configBlobServerBaseURI))
+	s, err := a.bsClient.getSignedURL(httpClient, blobMetadata, config.GetString(configBlobServerBaseURI))
 	if err != nil {
 		log.Errorf("Unable to fetch signed upload URL: %v", err)
 		writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable fetch signed upload URL")
 	} else {
-		res, err := uploadToBlobstore(httpClient, s, r.Body)
+		res, err := a.bsClient.uploadToBlobstore(httpClient, s, r.Body)
 		if err != nil {
 			log.Errorf("Unable to use signed url for upload: %v", err)
 			writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable to use signed url for upload")
@@ -175,7 +171,7 @@ func additionOrDeletionDetected(result getTraceSignalsResult, ifNoneMatch string
 	clientTraceSessionExistence := make(map[string]bool)
 	apidTraceSessionExistence := make(map[string]bool)
 	for _, id := range strings.Split(ifNoneMatch, ",") {
-		clientTraceSessionExistence[id] = true
+		clientTraceSessionExistence[strings.TrimSpace(id)] = true
 	}
 
 	for _, signal := range result.Signals {
@@ -184,13 +180,13 @@ func additionOrDeletionDetected(result getTraceSignalsResult, ifNoneMatch string
 
 		//check for new trace signals
 		if (!clientTraceSessionExistence[signal.Id]) {
-			return true;
+			return true
 		}
 	}
 	for id := range clientTraceSessionExistence {
 		//check for deleted trace signal. If deleted, we should response to update the state
 		if (!apidTraceSessionExistence[id]) {
-			return true;
+			return true
 		}
 	}
 
