@@ -1,14 +1,16 @@
 package apidGatewayTrace
 
 import (
+	"encoding/json"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"io/ioutil"
-	"net/http/httptest"
-	"net/http"
-	"encoding/json"
 	"io"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"github.com/pkg/errors"
+	"net/url"
 )
 
 var _ = Describe("DBManager", func() {
@@ -28,42 +30,34 @@ var _ = Describe("DBManager", func() {
 	Context("getSignedUrl method", func() {
 
 		It("should panic with unparseable blobServerUrl", func() {
-			Expect(func(){bsClient.getSignedURL(blobCreationMetadata{}, "NOT-A.UR$%L!!")}).To(Panic())
+			_, err := bsClient.getSignedURL(blobCreationMetadata{}, "NOT-A.UR$%L!!")
+			Expect(err).ToNot(Succeed())
+			cause, ok := errors.Cause(err).(*url.Error)
+			Expect(ok).To(BeTrue())
+			Expect(cause).ToNot(Succeed())
 		})
 
-		It("should propogate error if error occurs during fetch of signed url", func() {
+		It("should propagate error if error occurs during fetch of signed url", func() {
 			config.Set(configBearerToken, "bearer_token")
-			bcm := blobCreationMetadata{
-				Customer: "cust",
-				Organization: "org",
-				Environment: "env",
-				Tags: []string{"tag1", "tag2"},
-
-			}
+			bcm := blobCreationMetadata{}
 			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(500)
 			}))
-			_, err1 := bsClient.postWithAuth(blobstore.URL + blobStoreUri, bcm)
+			_, err1 := bsClient.postWithAuth(blobstore.URL+blobStoreUri, bcm)
 			Expect(err1).ToNot(Succeed())
 			s, err2 := bsClient.getSignedURL(bcm, blobstore.URL)
 			Expect(s).To(Equal(""))
 			Expect(err2).ToNot(Succeed())
-			Expect(err1).To(Equal(err2))
+			//these should be the same error. This is testing proper error propagation
+			Expect(err1.Error()).To(Equal(errors.Cause(err2).Error()))
 			blobstore.Close()
 		})
 
 		It("should return error if blobstore returns garbage signed URL", func() {
 			config.Set(configBearerToken, "bearer_token")
-			bcm := blobCreationMetadata{
-				Customer: "cust",
-				Organization: "org",
-				Environment: "env",
-				Tags: []string{"tag1", "tag2"},
-
-			}
+			bcm := blobCreationMetadata{}
 			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
 				w.Write(nil)
-				w.WriteHeader(200)
 			}))
 			s, err2 := bsClient.getSignedURL(bcm, blobstore.URL)
 			Expect(s).To(Equal(""))
@@ -73,20 +67,13 @@ var _ = Describe("DBManager", func() {
 
 		It("should return signed url on success", func() {
 			config.Set(configBearerToken, "bearer_token")
-			bcm := blobCreationMetadata{
-				Customer: "cust",
-				Organization: "org",
-				Environment: "env",
-				Tags: []string{"tag1", "tag2"},
-
-			}
+			bcm := blobCreationMetadata{}
 
 			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
 				blobServerResponse := blobServerResponse{}
 				blobServerResponse.SignedUrl = "signedurl"
 				bytes, _ := json.Marshal(blobServerResponse)
 				w.Write(bytes)
-				w.WriteHeader(200)
 			}))
 
 			s, err := bsClient.getSignedURL(bcm, blobstore.URL)
@@ -101,11 +88,10 @@ var _ = Describe("DBManager", func() {
 		It("should fetch data", func() {
 			config.Set(configBearerToken, "bearer_token")
 			bcm := blobCreationMetadata{
-				Customer: "cust",
+				Customer:     "cust",
 				Organization: "org",
-				Environment: "env",
-				Tags: []string{"tag1", "tag2"},
-
+				Environment:  "env",
+				Tags:         []string{"tag1", "tag2"},
 			}
 			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
 				Expect(r.Header.Get("Authorization")).To(Equal("Bearer bearer_token"))
@@ -129,11 +115,10 @@ var _ = Describe("DBManager", func() {
 			config.Set(configBearerToken, "bearer_token")
 			var handlerCalled bool
 			bcm := blobCreationMetadata{
-				Customer: "cust",
+				Customer:     "cust",
 				Organization: "org",
-				Environment: "env",
-				Tags: []string{"tag1", "tag2"},
-
+				Environment:  "env",
+				Tags:         []string{"tag1", "tag2"},
 			}
 			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
 				handlerCalled = true
@@ -190,7 +175,7 @@ func (bh *blobstoreHandler) ServeHTTP(r http.ResponseWriter, req *http.Request) 
 	bh.handle(r, req)
 }
 
-func getHandler(handler func(w http.ResponseWriter, r *http.Request)) http.Handler{
+func getHandler(handler func(w http.ResponseWriter, r *http.Request)) http.Handler {
 	return &blobstoreHandler{
 		handle: handler,
 	}

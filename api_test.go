@@ -229,7 +229,7 @@ var _ = Describe("API Implementation", func() {
 			apiMan := apiManager{
 				bsClient: &mockBsClient,
 			}
-			mockBsClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("", errors.New("can't get url"))
+			mockBsClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("", errors.New("mock bsClient err: can't get url"))
 			apiMan.apiUploadTraceDataEndpoint(w, r)
 			Expect(w.Code).To(Equal(500))
 
@@ -244,7 +244,7 @@ var _ = Describe("API Implementation", func() {
 				bsClient: &mockBsClient,
 			}
 			mockBsClient.On("getSignedURL", mock.AnythingOfType("blobCreationMetadata"), config.GetString(configBlobServerBaseURI)).Return("testurl", nil)
-			mockBsClient.On("uploadToBlobstore", "testurl", r.Body).Return(&http.Response{}, errors.New("can't upload"))
+			mockBsClient.On("uploadToBlobstore", "testurl", r.Body).Return(&http.Response{}, errors.New("mock bsClient err: can't upload"))
 
 			apiMan.apiUploadTraceDataEndpoint(w, r)
 			Expect(w.Code).To(Equal(500))

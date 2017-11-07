@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"github.com/pkg/errors"
 )
 
 const (
 	API_ERR_BAD_BLOCK = iota + 1
-	API_ERR_INTERNAL
 	API_ERR_DB_ERROR
 	API_ERR_BAD_DATA_MARSHALL
 	API_ERR_BAD_DEBUG_HEADER
@@ -65,7 +65,9 @@ func (a *apiManager) apiGetTraceSignalEndpoint(w http.ResponseWriter, r *http.Re
 	// send unmodified if matches prior eTag and no timeout
 	result, err := a.dbMan.getTraceSignals()
 	if err != nil {
-
+		log.Errorf("%v", err)
+		writeError(w, http.StatusInternalServerError, API_ERR_DB_ERROR, err.Error())
+		return
 	}
 
 	if additionOrDeletionDetected(result, ifNoneMatch) {
@@ -105,14 +107,16 @@ func (a *apiManager) sendTraceSignals(signals interface{}, w http.ResponseWriter
 	b, err := json.Marshal(result)
 	if err != nil {
 		log.Errorf("unable to marshal trace signals: %v", err)
-		writeError(w, http.StatusInternalServerError, API_ERR_BAD_DATA_MARSHALL, "Unable to marshal trace signals")
+		writeError(w, http.StatusInternalServerError, API_ERR_BAD_DATA_MARSHALL, err.Error())
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)
 }
 
 func (a *apiManager) apiUploadTraceDataEndpoint(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	blobMetadata := blobCreationMetadata{}
 	sessionId := r.Header.Get(UPLOAD_TRACESESSION_HEADER)
 	if sessionId != "" && (len(strings.Split(sessionId, "__")) == 5) {
@@ -122,18 +126,20 @@ func (a *apiManager) apiUploadTraceDataEndpoint(w http.ResponseWriter, r *http.R
 		blobMetadata.Environment = sessionIdComponents[1]
 		blobMetadata.Tags = []string{sessionIdComponents[4], sessionId}
 	} else {
-		writeError(w, 400, API_ERR_BAD_DEBUG_HEADER, fmt.Sprintf("Bad value for required header X-Apigee-Debug-ID: %s", sessionId))
+		writeError(w, http.StatusBadRequest, API_ERR_BAD_DEBUG_HEADER, fmt.Sprintf("Bad value for required header X-Apigee-Debug-ID: %s", sessionId))
 		return
 	}
 
 	s, err := a.bsClient.getSignedURL(blobMetadata, config.GetString(configBlobServerBaseURI))
 	if err != nil {
-		log.Errorf("Unable to fetch signed upload URL: %v", err)
+		err = errors.Wrap(err,"Unable to fetch signed upload URL")
+		log.Errorf("%v", err)
 		writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable fetch signed upload URL")
 	} else {
 		res, err := a.bsClient.uploadToBlobstore(s, r.Body)
 		if err != nil {
-			log.Errorf("Unable to use signed url for upload: %v", err)
+			err = errors.Wrap(err,"Unable to use signed url for upload")
+			log.Errorf("%v", err)
 			writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable to use signed url for upload")
 		} else {
 			w.WriteHeader(res.StatusCode)

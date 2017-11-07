@@ -2,6 +2,8 @@ package apidGatewayTrace
 
 import (
 	"github.com/apid/apid-core"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -34,14 +36,14 @@ func (dbc *dbManager) getTraceSignals() (result getTraceSignalsResult, err error
 
 	rows, err := dbc.getDb().Query(TRACESIGNAL_DB_QUERY)
 	if err != nil {
-		log.Errorf("DB Query \"%s\" failed %v", TRACESIGNAL_DB_QUERY, err)
-		return
+		return result, errors.Wrapf(err, "DB Query \"%s\" failed %v", TRACESIGNAL_DB_QUERY)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id, uri string
 		err = rows.Scan(&id, &uri)
 		if err != nil {
+			err = errors.Wrap(err, "failed to scan row")
 			return getTraceSignalsResult{Err: err}, err
 		}
 		signals = append(signals, traceSignal{Id: id, Uri: uri})
