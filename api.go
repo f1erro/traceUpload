@@ -26,7 +26,6 @@ const (
 	UPLOAD_TRACESESSION_HEADER = "X-Apigee-Debug-ID"
 )
 
-
 //InitAPI registers the two trace related endpoints, and starts a goroutine which assists in distributing
 //events (new signals) in support of long polling
 func (a *apiManager) InitAPI() {
