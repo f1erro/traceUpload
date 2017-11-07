@@ -177,7 +177,7 @@ var _ = Describe("API Implementation", func() {
 			apiMan.InitAPI()
 			go apiMan.apiGetTraceSignalEndpoint(w, r)
 			<-time.After(1 * time.Second)
-			Expect(w.Code).To(Equal(0))//has not completed yet
+			Expect(w.Code).To(Equal(0))                                                          //has not completed yet
 			_, err := dbMan.db.Exec("INSERT into metadata_trace (id, uri) VALUES('5', 'uri5');") //delete 4
 			Expect(err).To(Succeed())
 			apiMan.notifyChange(nil)

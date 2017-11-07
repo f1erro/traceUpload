@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/apid/apid-core/util"
+	"github.com/pkg/errors"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
-	"github.com/pkg/errors"
-	"reflect"
 )
 
 const (
@@ -127,13 +127,13 @@ func (a *apiManager) apiUploadTraceDataEndpoint(w http.ResponseWriter, r *http.R
 
 	s, err := a.bsClient.getSignedURL(blobMetadata, config.GetString(configBlobServerBaseURI))
 	if err != nil {
-		err = errors.Wrap(err,"Unable to fetch signed upload URL")
+		err = errors.Wrap(err, "Unable to fetch signed upload URL")
 		log.Errorf("%v", err)
 		writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable fetch signed upload URL")
 	} else {
 		res, err := a.bsClient.uploadToBlobstore(s, r.Body)
 		if err != nil {
-			err = errors.Wrap(err,"Unable to use signed url for upload")
+			err = errors.Wrap(err, "Unable to use signed url for upload")
 			log.Errorf("%v", err)
 			writeError(w, http.StatusInternalServerError, API_ERR_BLOBSTORE, "Unable to use signed url for upload")
 		} else {
@@ -176,7 +176,7 @@ func additionOrDeletionDetected(result getTraceSignalsResult, ifNoneMatch string
 	return !reflect.DeepEqual(clientTraceSessionExistence, apidTraceSessionExistence)
 }
 
-func createBlobMetadataFromSessionId(sessionId string) (blobCreationMetadata, error){
+func createBlobMetadataFromSessionId(sessionId string) (blobCreationMetadata, error) {
 	blobMetadata := blobCreationMetadata{}
 	if sessionId != "" {
 		sessionIdComponents := strings.Split(sessionId, "__")

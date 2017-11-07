@@ -3,12 +3,12 @@ package apidGatewayTrace
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"github.com/pkg/errors"
-	"fmt"
 )
 
 func (bc *blobstoreClient) getSignedURL(blobMetadata blobCreationMetadata, blobServerURL string) (string, error) {
@@ -16,7 +16,7 @@ func (bc *blobstoreClient) getSignedURL(blobMetadata blobCreationMetadata, blobS
 	blobUri, err := url.Parse(blobServerURL)
 	if err != nil {
 		//do not panic here, apid should live even if trace plugin was misconfigured
-		return "", errors.Wrapf(err,"bad url value for config %s: %s", blobUri, err)
+		return "", errors.Wrapf(err, "bad url value for config %s: %s", blobUri, err)
 	}
 
 	blobUri.Path += blobStoreUri
@@ -51,7 +51,7 @@ func (bc *blobstoreClient) uploadToBlobstore(uriString string, data io.Reader) (
 	req.Header.Add("Content-Type", "application/octet-stream")
 	res, err := bc.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err,"http error in attempt to upload to blobstore")
+		return nil, errors.Wrap(err, "http error in attempt to upload to blobstore")
 	}
 	if res.StatusCode != 200 && res.StatusCode != 201 {
 		res.Body.Close()
@@ -64,7 +64,7 @@ func (bc *blobstoreClient) postWithAuth(uriString string, blobMetadata blobCreat
 
 	b, err := json.Marshal(blobMetadata)
 	if err != nil {
-		return nil, errors.Wrapf(err,"Failed to marshal blob metadata for blob %v", blobMetadata)
+		return nil, errors.Wrapf(err, "Failed to marshal blob metadata for blob %v", blobMetadata)
 	}
 
 	req, err := http.NewRequest("POST", uriString, bytes.NewReader(b))

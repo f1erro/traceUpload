@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"strings"
-	"github.com/pkg/errors"
 	"net/url"
+	"strings"
 )
 
 var _ = Describe("DBManager", func() {
