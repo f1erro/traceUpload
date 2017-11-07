@@ -3,13 +3,12 @@ package apidGatewayTrace
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	//"github.com/apid/apid-core/factory"
 	"io/ioutil"
 	"net/http/httptest"
 	"net/http"
 	"encoding/json"
 	"io"
+	"strings"
 )
 
 var _ = Describe("DBManager", func() {
@@ -30,6 +29,70 @@ var _ = Describe("DBManager", func() {
 
 		It("should panic with unparseable blobServerUrl", func() {
 			Expect(func(){bsClient.getSignedURL(blobCreationMetadata{}, "NOT-A.UR$%L!!")}).To(Panic())
+		})
+
+		It("should propogate error if error occurs during fetch of signed url", func() {
+			config.Set(configBearerToken, "bearer_token")
+			bcm := blobCreationMetadata{
+				Customer: "cust",
+				Organization: "org",
+				Environment: "env",
+				Tags: []string{"tag1", "tag2"},
+
+			}
+			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(500)
+			}))
+			_, err1 := bsClient.postWithAuth(blobstore.URL + blobStoreUri, bcm)
+			Expect(err1).ToNot(Succeed())
+			s, err2 := bsClient.getSignedURL(bcm, blobstore.URL)
+			Expect(s).To(Equal(""))
+			Expect(err2).ToNot(Succeed())
+			Expect(err1).To(Equal(err2))
+			blobstore.Close()
+		})
+
+		It("should return error if blobstore returns garbage signed URL", func() {
+			config.Set(configBearerToken, "bearer_token")
+			bcm := blobCreationMetadata{
+				Customer: "cust",
+				Organization: "org",
+				Environment: "env",
+				Tags: []string{"tag1", "tag2"},
+
+			}
+			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
+				w.Write(nil)
+				w.WriteHeader(200)
+			}))
+			s, err2 := bsClient.getSignedURL(bcm, blobstore.URL)
+			Expect(s).To(Equal(""))
+			Expect(err2).ToNot(Succeed())
+			blobstore.Close()
+		})
+
+		It("should return signed url on success", func() {
+			config.Set(configBearerToken, "bearer_token")
+			bcm := blobCreationMetadata{
+				Customer: "cust",
+				Organization: "org",
+				Environment: "env",
+				Tags: []string{"tag1", "tag2"},
+
+			}
+
+			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
+				blobServerResponse := blobServerResponse{}
+				blobServerResponse.SignedUrl = "signedurl"
+				bytes, _ := json.Marshal(blobServerResponse)
+				w.Write(bytes)
+				w.WriteHeader(200)
+			}))
+
+			s, err := bsClient.getSignedURL(bcm, blobstore.URL)
+			Expect(err).To(Succeed())
+			Expect(s).To(Equal("signedurl"))
+			blobstore.Close()
 		})
 	})
 
@@ -84,24 +147,37 @@ var _ = Describe("DBManager", func() {
 		})
 	})
 
-	/*Context("uploadToBlobstore", func() {
+	Context("uploadToBlobstore", func() {
 		It("should call blobstore", func() {
-			bcm := blobCreationMetadata{
-				Customer: "cust",
-				Organization: "org",
-				Environment: "env",
-				Tags: []string{"tag1", "tag2"},
-
-			}
 			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
 				Expect(r.Method).To(Equal("PUT"))
+				Expect(r.Header.Get("Content-Type"), "application/octet-stream")
+				responseBytes, err := ioutil.ReadAll(r.Body)
+				Expect(err).To(Succeed())
+				Expect(responseBytes).To(Equal([]byte("a trace")))
+				w.Write([]byte("Success"))
 			}))
-			rc, err := bsClient.uploadToBlobstore(blobstore.URL, )
-			Expect(rc).To(BeNil())
+			content := strings.NewReader("a trace")
+			r, err := bsClient.uploadToBlobstore(blobstore.URL, content)
+			Expect(err).To(Succeed())
+			responseBytes, err := ioutil.ReadAll(r.Body)
+			Expect(err).To(Succeed())
+			Expect(responseBytes).To(Equal([]byte("Success")))
+			blobstore.Close()
+		})
+
+		It("should return error if storage does not return 2xx", func() {
+			blobstore := httptest.NewServer(getHandler(func(w http.ResponseWriter, r *http.Request) {
+				Expect(r.Method).To(Equal("PUT"))
+				w.WriteHeader(401)
+			}))
+			content := strings.NewReader("a trace")
+			r, err := bsClient.uploadToBlobstore(blobstore.URL, content)
+			Expect(r).To(BeNil())
 			Expect(err).ToNot(Succeed())
 			blobstore.Close()
 		})
-	})*/
+	})
 
 })
 

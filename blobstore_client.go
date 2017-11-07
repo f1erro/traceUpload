@@ -43,7 +43,7 @@ func (bc *blobstoreClient) getSignedURL(blobMetadata blobCreationMetadata, blobS
 	return res.SignedUrl, nil
 }
 
-func (bc *blobstoreClient) uploadToBlobstore(uriString string, data io.ReadCloser) (*http.Response, error) {
+func (bc *blobstoreClient) uploadToBlobstore(uriString string, data io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest("PUT", uriString, data)
 	if err != nil {
 		return nil, err
