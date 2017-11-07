@@ -12,12 +12,14 @@ var (
 	config   apid.ConfigService
 )
 
+//initServices initializes global apid-core based variables
 func initServices(s apid.Services) {
 	services = s
 	log = services.Log().ForModule("apidGatewayTrace")
 	config = services.Config()
 }
 
+//initPlugin creates the necessary structures for interacting with the database and blobstore, as well as the API impl
 func initPlugin(s apid.Services) (apid.PluginData, error) {
 	initServices(s)
 	log.Debugf("Initializing %s", pluginData.Name)
@@ -61,6 +63,7 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 	return pluginData, nil
 }
 
+//init is the entrypoint into the plugin, which registers this plugin with apid core
 func init() {
 	apid.RegisterPlugin(initPlugin, pluginData)
 }

@@ -26,6 +26,9 @@ const (
 	UPLOAD_TRACESESSION_HEADER = "X-Apigee-Debug-ID"
 )
 
+
+//InitAPI registers the two trace related endpoints, and starts a goroutine which assists in distributing
+//events (new signals) in support of long polling
 func (a *apiManager) InitAPI() {
 	if a.apiInitialized {
 		return
@@ -37,10 +40,12 @@ func (a *apiManager) InitAPI() {
 	log.Debug("API endpoints initialized")
 }
 
+//notifyChange sends an object to the change notification channel used to kick of event distribution
 func (a *apiManager) notifyChange(arg interface{}) {
 	a.newSignal <- arg
 }
 
+//apiGetTraceSignalEndpoint is the API implementation for retrieving a list of trace sessions initiated via the MGMT API
 func (a *apiManager) apiGetTraceSignalEndpoint(w http.ResponseWriter, r *http.Request) {
 	b := r.URL.Query().Get("block")
 	var timeout int
@@ -86,11 +91,14 @@ func (a *apiManager) apiGetTraceSignalEndpoint(w http.ResponseWriter, r *http.Re
 
 }
 
+//LongPollTimeoutHandler is the simple callback to represent a StatusNotModified HTTP code in the event that
+//the long polling block timeout, provided by the API caller, is reached
 func (a *apiManager) LongPollTimeoutHandler(w http.ResponseWriter) {
 	log.Debug("long-polling tracesignals request timed out.")
 	w.WriteHeader(http.StatusNotModified)
 }
 
+//sendTraceSignals uses the database manager to retrieve the list of signals and write them to the response as JSON
 func (a *apiManager) sendTraceSignals(signals interface{}, w http.ResponseWriter) {
 
 	var result getTraceSignalsResult
@@ -116,6 +124,7 @@ func (a *apiManager) sendTraceSignals(signals interface{}, w http.ResponseWriter
 	w.Write(b)
 }
 
+//apiUploadTraceDataEndpoint is the API Implementation for uploading the trace data for a single completed request
 func (a *apiManager) apiUploadTraceDataEndpoint(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	sessionId := r.Header.Get(UPLOAD_TRACESESSION_HEADER)
@@ -142,6 +151,8 @@ func (a *apiManager) apiUploadTraceDataEndpoint(w http.ResponseWriter, r *http.R
 	}
 }
 
+//writeError writes an error to the HTTP response, providing an error code which can be correlated with the enum
+//at the top of this file, and a reason which is typically the output of an error's Error() method
 func writeError(w http.ResponseWriter, status int, code int, reason string) {
 	w.WriteHeader(status)
 	e := errorResponse{
@@ -157,6 +168,9 @@ func writeError(w http.ResponseWriter, status int, code int, reason string) {
 	log.Debugf("sending %d error to client: %s", status, reason)
 }
 
+//additionOrDeletionDetected compares what trace sessions are currently active on an MP and the actual state
+//(active sessions) as represented by those which exist in the database.  An session which exists in the MP but not
+//the database represents a deletion, whereas an entry which exists in the database but not the MP represents a new signal
 func additionOrDeletionDetected(result getTraceSignalsResult, ifNoneMatch string) bool {
 	clientTraceSessionExistence := make(map[string]bool)
 	apidTraceSessionExistence := make(map[string]bool)
@@ -176,6 +190,8 @@ func additionOrDeletionDetected(result getTraceSignalsResult, ifNoneMatch string
 	return !reflect.DeepEqual(clientTraceSessionExistence, apidTraceSessionExistence)
 }
 
+//createBlobMetadataFromSessionId parses the canonical sessionId, which is an MP internal format, into a useable data
+//structure for interacting with the blob creation API of the blobstore service
 func createBlobMetadataFromSessionId(sessionId string) (blobCreationMetadata, error) {
 	blobMetadata := blobCreationMetadata{}
 	if sessionId != "" {

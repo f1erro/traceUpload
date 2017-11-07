@@ -10,6 +10,7 @@ const (
 	TRACESIGNAL_DB_QUERY = `SELECT id, uri FROM metadata_trace;`
 )
 
+//setDbVersion updates the database version so that our database connection connects to the correct sqlite database
 func (dbc *dbManager) setDbVersion(version string) {
 	db, err := dbc.data.DBVersion(version)
 	if err != nil {
@@ -20,16 +21,19 @@ func (dbc *dbManager) setDbVersion(version string) {
 	dbc.dbMux.Unlock()
 }
 
+//getDb is a mutex protected access method to the database client
 func (dbc *dbManager) getDb() apid.DB {
 	dbc.dbMux.RLock()
 	defer dbc.dbMux.RUnlock()
 	return dbc.db
 }
 
+//initDb currently does nothing, but is here as scaffolding in case database manipulation is desired or useful in the future
 func (dbc *dbManager) initDb() error {
 	return nil
 }
 
+//getTraceSignals issues a SQL query to retrieve all trace signals known to apid
 func (dbc *dbManager) getTraceSignals() (result getTraceSignalsResult, err error) {
 
 	signals := make([]traceSignal, 0)

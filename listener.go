@@ -10,14 +10,17 @@ const (
 	TRACESIGNAL_PG_TABLENAME = "metadata.trace"
 )
 
+//initListener registers this listener for either a change or snapshot event
 func (h *apigeeSyncHandler) initListener(services apid.Services) {
 	services.Events().Listen(APIGEE_SYNC_EVENT, h)
 }
 
+//String returns the plugin name
 func (h *apigeeSyncHandler) String() string {
 	return pluginData.Name
 }
 
+//Handle delegates the processing of a changelist or snapshot to the appropriate handlers
 func (h *apigeeSyncHandler) Handle(e apid.Event) {
 
 	if changeSet, ok := e.(*common.ChangeList); ok {
@@ -29,7 +32,8 @@ func (h *apigeeSyncHandler) Handle(e apid.Event) {
 	}
 }
 
-//todo handle case where trace signal comes in during new snapshot (not boot). need to debounce
+//processSnapshot assumes that all rows have already been inserted by apidApigeeSync plugin, and merely updates the db
+//version.  It also calls the idempotent InitAPI method of it's apiManager
 func (h *apigeeSyncHandler) processSnapshot(snapshot *common.Snapshot) {
 
 	log.Debugf("Snapshot received. Switching to DB version: %s", snapshot.SnapshotInfo)
@@ -41,6 +45,8 @@ func (h *apigeeSyncHandler) processSnapshot(snapshot *common.Snapshot) {
 	log.Debug("Snapshot processed")
 }
 
+//processChangeList notifies the API implementation of a possible change.  Only Insert and Delete operations are
+//supported for trace signals
 func (h *apigeeSyncHandler) processChangeList(changes *common.ChangeList) {
 
 	log.Debugf("Processing changes")
