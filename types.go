@@ -47,14 +47,14 @@ type blobServerResponse struct {
 	Customer                 string   `json:"customer"`
 }
 
-//apiddSyncHandler is what listens for apid events
+//apigeeSyncHandler is what listens for apid events
 type apigeeSyncHandler struct {
 	dbMan  dbManagerInterface
 	apiMan apiManagerInterface
 	closed bool
 }
 
-//apiManager provides the API implementations and hooks into apid-core long polling event distribution tooling
+//apiManagerInterface provides the API implementations and hooks into apid-core long polling event distribution tooling
 type apiManagerInterface interface {
 	InitAPI()
 	notifyChange(interface{})
