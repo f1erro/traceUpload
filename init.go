@@ -2,7 +2,6 @@ package apidGatewayTrace
 
 import (
 	"github.com/apid/apid-core"
-	"golang.org/x/crypto/ed25519"
 	"net/http"
 	"sync"
 )

@@ -3,9 +3,7 @@ package apidGatewayTrace
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	//"github.com/apigee-labs/transicator/common"
 	"github.com/apid/apid-core"
-	//"github.com/apid/apid-core/factory"
 	"io/ioutil"
 	"strconv"
 	"sync"
