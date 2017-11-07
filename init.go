@@ -2,6 +2,7 @@ package apidGatewayTrace
 
 import (
 	"github.com/apid/apid-core"
+	"golang.org/x/crypto/ed25519"
 	"net/http"
 	"sync"
 )
@@ -10,6 +11,11 @@ var (
 	log      apid.LogService // set in initPlugin
 	services apid.Services
 	config   apid.ConfigService
+)
+
+const (
+	signalEndpoint = "/tracesignals"
+	uploadEndpoint = "/uploadtrace"
 )
 
 //initServices initializes global apid-core based variables
@@ -42,8 +48,8 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 				},
 			},
 		},
-		signalEndpoint: "/tracesignals",
-		uploadEndpoint: "/uploadTrace",
+		signalEndpoint: signalEndpoint,
+		uploadEndpoint: uploadEndpoint,
 		apiInitialized: false,
 		newSignal:      make(chan interface{}),
 		addSubscriber:  make(chan chan interface{}),
