@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 	"github.com/pkg/errors"
+	"reflect"
 )
 
 const (
@@ -55,7 +56,7 @@ func (a *apiManager) apiGetTraceSignalEndpoint(w http.ResponseWriter, r *http.Re
 
 	// If-None-Match is a csv of active debug session IDs
 	ifNoneMatch := r.Header.Get("If-None-Match")
-	log.Debugf("if-none-match: %s", ifNoneMatch)
+	log.Debugf("If-None-Match: %s", ifNoneMatch)
 
 	if ifNoneMatch == "" {
 		a.sendTraceSignals(nil, w)
@@ -117,16 +118,10 @@ func (a *apiManager) sendTraceSignals(signals interface{}, w http.ResponseWriter
 
 func (a *apiManager) apiUploadTraceDataEndpoint(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	blobMetadata := blobCreationMetadata{}
 	sessionId := r.Header.Get(UPLOAD_TRACESESSION_HEADER)
-	if sessionId != "" && (len(strings.Split(sessionId, "__")) == 5) {
-		sessionIdComponents := strings.Split(sessionId, "__")
-		blobMetadata.Customer = sessionIdComponents[0]
-		blobMetadata.Organization = sessionIdComponents[0]
-		blobMetadata.Environment = sessionIdComponents[1]
-		blobMetadata.Tags = []string{sessionIdComponents[4], sessionId}
-	} else {
-		writeError(w, http.StatusBadRequest, API_ERR_BAD_DEBUG_HEADER, fmt.Sprintf("Bad value for required header X-Apigee-Debug-ID: %s", sessionId))
+	blobMetadata, err := createBlobMetadataFromSessionId(sessionId)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, API_ERR_BAD_DEBUG_HEADER, err.Error())
 		return
 	}
 
@@ -178,12 +173,20 @@ func additionOrDeletionDetected(result getTraceSignalsResult, ifNoneMatch string
 			return true
 		}
 	}
-	for id := range clientTraceSessionExistence {
-		//check for deleted trace signal. If deleted, we should response to update the state
-		if !apidTraceSessionExistence[id] {
-			return true
+	return !reflect.DeepEqual(clientTraceSessionExistence, apidTraceSessionExistence)
+}
+
+func createBlobMetadataFromSessionId(sessionId string) (blobCreationMetadata, error){
+	blobMetadata := blobCreationMetadata{}
+	if sessionId != "" {
+		sessionIdComponents := strings.Split(sessionId, "__")
+		if len(strings.Split(sessionId, "__")) == 5 {
+			blobMetadata.Customer = sessionIdComponents[0]
+			blobMetadata.Organization = sessionIdComponents[0]
+			blobMetadata.Environment = sessionIdComponents[1]
+			blobMetadata.Tags = []string{sessionIdComponents[4], sessionId}
+			return blobMetadata, nil
 		}
 	}
-
-	return false
+	return blobMetadata, fmt.Errorf("Bad value for required header X-Apigee-Debug-ID: %s", sessionId)
 }
